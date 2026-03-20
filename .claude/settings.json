@@ -18,7 +18,11 @@
       "Read(//c/Users/Administrator/Desktop/DaXianDevDaXianDesk/libs/hbb_common/src/**)",
       "Read(//c/Users/Administrator/.claude/projects/c--Users-Administrator-Desktop-DaXian-Dev-DaXianDesk/memory/**)",
       "Bash(find flutter/lib -name \"*.dart\" -exec grep -l \"auth\\\\|oauth\\\\|oidc\" {})",
-      "Bash(find flutter/assets -name *auth*)"
+      "Bash(find flutter/assets -name *auth*)",
+      "Bash(find /c/Users/Administrator/Desktop/DaXian/Dev/DaXianDesk -type f -name *.kt)",
+      "Bash(where python:*)",
+      "Bash(python -c \":*)",
+      "Bash(find /c/Users/Administrator/Desktop/DaXian/Dev/DaXianDesk/flutter/android/app/src/main/kotlin -type f -name *.kt)"
     ]
   }
 }

