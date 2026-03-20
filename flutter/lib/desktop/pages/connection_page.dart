@@ -18,6 +18,7 @@ import '../../common.dart';
 import '../../common/formatter/id_formatter.dart';
 import '../../common/widgets/peer_tab_page.dart';
 import '../../common/widgets/autocomplete.dart';
+import '../../common/widgets/login.dart';
 import '../../models/platform_model.dart';
 import '../../desktop/widgets/material_mod_popup_menu.dart' as mod_menu;
 
@@ -131,9 +132,22 @@ class _OnlineStatusWidgetState extends State<OnlineStatusWidget> {
             ),
             // stop
             if (!isIncomingOnly) startServiceWidget(),
-            // ready && public
-            // No need to show the guide if is custom client.
-            if (!isIncomingOnly) setupServerWidget(),
+            // DaXian: 靠右显示设备识别码（UUID），右侧保留间距
+            Expanded(child: SizedBox()),
+            FutureBuilder<String>(
+              future: bind.mainGetUuid(),
+              builder: (context, snapshot) {
+                final uuid = snapshot.data ?? '';
+                if (uuid.isEmpty) return SizedBox.shrink();
+                return Padding(
+                  padding: const EdgeInsets.only(right: 12.0),
+                  child: SelectableText(
+                    '识别码：$uuid',
+                    style: TextStyle(fontSize: em * 0.9, color: Colors.grey),
+                  ),
+                );
+              },
+            ),
           ],
         );
 
@@ -330,7 +344,14 @@ class _ConnectionPageState extends State<ConnectionPage>
   void onConnect(
       {bool isFileTransfer = false,
       bool isViewCamera = false,
-      bool isTerminal = false}) {
+      bool isTerminal = false}) async {
+    // 未登录时弹出登录界面
+    if (!gFFI.userModel.isLogin) {
+      final res = await loginDialog();
+      if (res != true) {
+        return; // 用户取消登录，不继续连接
+      }
+    }
     var id = _idController.id;
     connect(context, id,
         isFileTransfer: isFileTransfer,
@@ -342,7 +363,6 @@ class _ConnectionPageState extends State<ConnectionPage>
   /// Search for a peer.
   Widget _buildRemoteIDTextField(BuildContext context) {
     var w = Container(
-      width: 320 + 20 * 2,
       padding: const EdgeInsets.fromLTRB(20, 24, 20, 22),
       decoration: BoxDecoration(
           borderRadius: const BorderRadius.all(Radius.circular(13)),
@@ -515,6 +535,39 @@ class _ConnectionPageState extends State<ConnectionPage>
             Padding(
               padding: const EdgeInsets.only(top: 13.0),
               child: Row(mainAxisAlignment: MainAxisAlignment.end, children: [
+                // 用户信息按钮（登录后显示用户名，登出后隐藏）
+                Obx(() => gFFI.userModel.userName.isNotEmpty
+                    ? Container(
+                        height: 28.0,
+                        margin: const EdgeInsets.only(right: 8),
+                        child: ElevatedButton.icon(
+                          onPressed: () {},
+                          icon: Icon(Icons.person, size: 16),
+                          label: Text(
+                            gFFI.userModel.displayNameOrUserName,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      )
+                    : const SizedBox.shrink()),
+                // 登录/登出按钮
+                Obx(() => Container(
+                      height: 28.0,
+                      margin: const EdgeInsets.only(right: 8),
+                      child: gFFI.userModel.userName.isNotEmpty
+                          ? ElevatedButton(
+                              onPressed: () {
+                                logOutConfirmDialog();
+                              },
+                              child: Text(translate("Logout")),
+                            )
+                          : ElevatedButton(
+                              onPressed: () async {
+                                await loginDialog();
+                              },
+                              child: Text(translate("Login")),
+                            ),
+                    )),
                 SizedBox(
                   height: 28.0,
                   child: ElevatedButton(
@@ -610,6 +663,6 @@ class _ConnectionPageState extends State<ConnectionPage>
       ),
     );
     return Container(
-        constraints: const BoxConstraints(maxWidth: 600), child: w);
+        margin: const EdgeInsets.only(right: 12.0), child: w);
   }
 }

@@ -403,10 +403,8 @@ Future<bool?> loginDialog() async {
   // Track hover state for the close icon
   bool isCloseHovered = false;
 
+  // DaXian: 禁用第三方登录选项查询
   final loginOptions = [].obs;
-  Future.delayed(Duration.zero, () async {
-    loginOptions.value = await UserModel.queryOidcLoginOptions();
-  });
 
   final res = await gFFI.dialogManager.show<bool>((setState, close, context) {
     username.addListener(() {
@@ -511,7 +509,7 @@ Future<bool?> loginDialog() async {
 
     thirdAuthWidget() => Obx(() {
           return Offstage(
-            offstage: loginOptions.isEmpty,
+            offstage: true, // DaXian: 始终隐藏第三方登录
             child: Column(
               children: [
                 const SizedBox(

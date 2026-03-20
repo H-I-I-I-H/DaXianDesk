@@ -290,6 +290,14 @@ class _SettingsState extends State<SettingsPage> with WidgetsBindingObserver {
       ],
     ));
     final List<AbstractSettingsTile> enhancementsTiles = [];
+    // 剪贴板同步选项
+    enhancementsTiles.add(SettingsTile.switchTile(
+        initialValue: gFFI.serverModel.clipboardOk,
+        title: Text(translate('Enable clipboard')),
+        onToggle: (toValue) {
+          gFFI.serverModel.toggleClipboard();
+          setState(() {});
+        }));
     final enable2fa = bind.mainHasValid2FaSync();
     final List<AbstractSettingsTile> tfaTiles = [
       SettingsTile.switchTile(

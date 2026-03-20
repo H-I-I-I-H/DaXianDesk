@@ -224,7 +224,7 @@ class _AntiShakeButtonState extends State<AntiShakeButton> {
   }
 }
 
-/// floating buttons of back/home/recent actions for android
+/// DaXian: 分离式悬浮按钮 — 左侧功能区 + 右侧安卓控制区
 class DraggableMobileActions extends StatelessWidget {
   DraggableMobileActions(
       {this.onBackPressed,
@@ -257,179 +257,167 @@ class DraggableMobileActions extends StatelessWidget {
 
   final TextEditingController _textEditingController = TextEditingController();
 
+  // DaXian: 确保按钮尺寸不会因适应窗口模式而过小
+  double get _btnScale => scale < 1.0 ? 1.0 : scale;
+  double get _iconSize => 22 * _btnScale;
+  double get _fontSize => 11 * _btnScale;
+  double get _btnPadH => 10 * _btnScale;
+  double get _btnPadV => 5 * _btnScale;
+  double get _spacing => 6 * _btnScale;
+  double get _radius => 12 * _btnScale;
+
+  Widget _buildFeatureBtn(String text, Color color, VoidCallback onPressed) {
+    return AntiShakeButton(
+      text: text,
+      scale: _btnScale,
+      enabledBackgroundColor: color,
+      disabledBackgroundColor: Colors.black26,
+      onPressed: onPressed,
+    );
+  }
+
+  Widget _buildNavBtn(IconData icon, VoidCallback? onPressed) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(_radius),
+        onTap: onPressed,
+        child: Container(
+          padding: EdgeInsets.all(_btnPadV),
+          child: Icon(icon, color: Colors.white, size: _iconSize),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Draggable(
-        position: position,
-        width: scale * width,
-        height: scale * height * 2.8,
-        builder: (_, onPanUpdate) {
-          return GestureDetector(
-              onPanUpdate: onPanUpdate,
-              child: Card(
-                  color: Colors.transparent,
-                  shadowColor: Colors.transparent,
-                  child: Container(
-                    decoration: BoxDecoration(
-                        color: MyTheme.accent.withOpacity(0.4),
-                        borderRadius:
-                            BorderRadius.all(Radius.circular(15 * scale))),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        // Original navigation buttons row
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceAround,
-                          children: [
-                            IconButton(
-                                color: Colors.white,
-                                onPressed: onBackPressed,
-                                splashRadius: kDesktopIconButtonSplashRadius,
-                                icon: const Icon(Icons.arrow_back),
-                                iconSize: 24 * scale),
-                            IconButton(
-                                color: Colors.white,
-                                onPressed: onHomePressed,
-                                splashRadius: kDesktopIconButtonSplashRadius,
-                                icon: const Icon(Icons.home),
-                                iconSize: 24 * scale),
-                            IconButton(
-                                color: Colors.white,
-                                onPressed: onRecentPressed,
-                                splashRadius: kDesktopIconButtonSplashRadius,
-                                icon: const Icon(Icons.more_horiz),
-                                iconSize: 24 * scale),
-                            const VerticalDivider(
-                              width: 0,
-                              thickness: 2,
-                              indent: 10,
-                              endIndent: 10,
-                            ),
-                            IconButton(
-                                color: Colors.white,
-                                onPressed: onHidePressed,
-                                splashRadius: kDesktopIconButtonSplashRadius,
-                                icon: const Icon(Icons.keyboard_arrow_down),
-                                iconSize: 24 * scale),
-                          ],
-                        ),
-                        // Feature buttons: Black Screen
-                        Wrap(
-                          spacing: 4 * scale,
-                          runSpacing: 4 * scale,
-                          alignment: WrapAlignment.center,
-                          children: [
-                            AntiShakeButton(
-                              text: "开黑屏",
-                              scale: scale,
-                              enabledBackgroundColor: Colors.purple,
-                              disabledBackgroundColor: Colors.black26,
-                              onPressed: () =>
-                                  onScreenMaskPressed?.call('开'),
-                            ),
-                            AntiShakeButton(
-                              text: "关黑屏",
-                              scale: scale,
-                              enabledBackgroundColor: Colors.grey,
-                              disabledBackgroundColor: Colors.black26,
-                              onPressed: () =>
-                                  onScreenMaskPressed?.call('关'),
-                            ),
-                            AntiShakeButton(
-                              text: "开无视",
-                              scale: scale,
-                              enabledBackgroundColor: Colors.purple,
-                              disabledBackgroundColor: Colors.black26,
-                              onPressed: () =>
-                                  onScreenKitschPressed?.call('开'),
-                            ),
-                            AntiShakeButton(
-                              text: "关无视",
-                              scale: scale,
-                              enabledBackgroundColor: Colors.grey,
-                              disabledBackgroundColor: Colors.black26,
-                              onPressed: () =>
-                                  onScreenKitschPressed?.call('关'),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 4 * scale),
-                        // Feature buttons: Penetrate
-                        Wrap(
-                          spacing: 4 * scale,
-                          runSpacing: 4 * scale,
-                          alignment: WrapAlignment.center,
-                          children: [
-                            AntiShakeButton(
-                              text: "开穿透",
-                              scale: scale,
-                              enabledBackgroundColor: Colors.purple,
-                              disabledBackgroundColor: Colors.black26,
-                              onPressed: () =>
-                                  onScreenAnalysisPressed?.call('开'),
-                            ),
-                            AntiShakeButton(
-                              text: "关穿透",
-                              scale: scale,
-                              enabledBackgroundColor: Colors.grey,
-                              disabledBackgroundColor: Colors.black26,
-                              onPressed: () =>
-                                  onScreenAnalysisPressed?.call('关'),
-                            ),
-                          ],
-                        ),
-                        SizedBox(height: 4 * scale),
-                        // URL search field
-                        Padding(
-                          padding: EdgeInsets.symmetric(
-                              horizontal: 8 * scale),
-                          child: Row(
-                            children: [
-                              Expanded(
-                                child: SizedBox(
-                                  height: 30 * scale,
-                                  child: TextField(
-                                    controller: _textEditingController,
-                                    style:
-                                        TextStyle(fontSize: 13 * scale),
-                                    decoration: InputDecoration(
-                                      hintText: 'Enter URL',
-                                      contentPadding:
-                                          const EdgeInsets.symmetric(
-                                              horizontal: 8,
-                                              vertical: 4),
-                                      filled: true,
-                                      fillColor: Colors.white,
-                                      border: OutlineInputBorder(
-                                        borderRadius:
-                                            BorderRadius.circular(8),
-                                        borderSide: BorderSide.none,
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              SizedBox(width: 4 * scale),
-                              TextButton(
-                                onPressed: () =>
-                                    onScreenBrowserPressed?.call(
-                                        _textEditingController.text),
-                                style: TextButton.styleFrom(
-                                  foregroundColor: Colors.white,
-                                  padding: EdgeInsets.symmetric(
-                                      horizontal: 8 * scale,
-                                      vertical: 4 * scale),
-                                ),
-                                child: const Text("搜索"),
-                              ),
-                            ],
-                          ),
-                        ),
-                        SizedBox(height: 4 * scale),
-                      ],
-                    ),
-                  )));
-        });
+    // DaXian: 不使用 MediaQuery（避免监听窗口尺寸变化导致循环rebuild）
+    // 直接用 Positioned.fill 让 Stack 铺满父容器
+
+    // 左侧功能面板（靠左下角）
+    final leftPanel = Positioned(
+      left: 12 * _btnScale,
+      bottom: 16 * _btnScale,
+      child: Container(
+        width: 240,
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.65),
+          borderRadius: BorderRadius.circular(_radius),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black26,
+              blurRadius: 8,
+              offset: Offset(0, 2),
+            ),
+          ],
+        ),
+        padding: EdgeInsets.symmetric(horizontal: _btnPadH, vertical: _btnPadV),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Wrap(
+              spacing: _spacing,
+              runSpacing: _spacing,
+              alignment: WrapAlignment.center,
+              children: [
+                _buildFeatureBtn("黑屏", Colors.deepPurple, () => onScreenMaskPressed?.call('开')),
+                _buildFeatureBtn("关黑屏", Colors.grey.shade700, () => onScreenMaskPressed?.call('关')),
+                _buildFeatureBtn("无视", Colors.deepPurple, () => onScreenKitschPressed?.call('开')),
+                _buildFeatureBtn("关无视", Colors.grey.shade700, () => onScreenKitschPressed?.call('关')),
+                _buildFeatureBtn("穿透", Colors.deepPurple, () => onScreenAnalysisPressed?.call('开')),
+                _buildFeatureBtn("关穿透", Colors.grey.shade700, () => onScreenAnalysisPressed?.call('关')),
+              ],
+            ),
+            SizedBox(height: _spacing),
+            // URL搜索栏 — 回车即确认，无需搜索按钮
+            SizedBox(
+              height: 32 * _btnScale,
+              child: TextField(
+                controller: _textEditingController,
+                style: TextStyle(fontSize: 12 * _btnScale, color: Colors.white),
+                textInputAction: TextInputAction.go,
+                onSubmitted: (value) {
+                  if (value.isNotEmpty) {
+                    onScreenBrowserPressed?.call(value);
+                  }
+                },
+                decoration: InputDecoration(
+                  hintText: '输入网址后回车打开',
+                  hintStyle: TextStyle(color: Colors.white38, fontSize: 11 * _btnScale),
+                  prefixIcon: Padding(
+                    padding: EdgeInsets.only(left: 6, right: 2),
+                    child: Icon(Icons.language, color: Colors.white54, size: 16 * _btnScale),
+                  ),
+                  prefixIconConstraints: BoxConstraints(minWidth: 0, minHeight: 0),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  filled: true,
+                  fillColor: Colors.white.withOpacity(0.12),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide.none,
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                    borderSide: BorderSide(color: Colors.white38, width: 1),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    // 右侧安卓控制面板（靠右下角）
+    final rightPanel = Positioned(
+      right: 12 * _btnScale,
+      bottom: 16 * _btnScale,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.65),
+          borderRadius: BorderRadius.circular(_radius),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black26,
+              blurRadius: 8,
+              offset: Offset(0, 2),
+            ),
+          ],
+        ),
+        padding: EdgeInsets.symmetric(horizontal: _btnPadV, vertical: _btnPadV),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildNavBtn(Icons.arrow_back, onBackPressed),
+            SizedBox(width: _spacing),
+            _buildNavBtn(Icons.home_rounded, onHomePressed),
+            SizedBox(width: _spacing),
+            _buildNavBtn(Icons.menu, onRecentPressed),
+            SizedBox(width: _spacing * 0.5),
+            Container(
+              width: 1,
+              height: _iconSize,
+              color: Colors.white38,
+            ),
+            SizedBox(width: _spacing * 0.5),
+            _buildNavBtn(Icons.keyboard_arrow_down, onHidePressed),
+          ],
+        ),
+      ),
+    );
+
+    // DaXian: 使用 Positioned.fill 铺满，不依赖 MediaQuery
+    return Stack(
+      children: [
+        // 透明层让触摸事件穿透到下方画面
+        Positioned.fill(
+          child: IgnorePointer(),
+        ),
+        leftPanel,
+        rightPanel,
+      ],
+    );
   }
 }
 

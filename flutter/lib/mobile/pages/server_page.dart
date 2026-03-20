@@ -23,10 +23,8 @@ class ServerPage extends StatefulWidget implements PageShape {
   final icon = const Icon(Icons.mobile_screen_share);
 
   @override
-  final appBarActions = (!bind.isDisableSettings() &&
-          bind.mainGetBuildinOption(key: kOptionHideSecuritySetting) != 'Y')
-      ? [_DropDownAction()]
-      : [];
+  // DaXian: 隐藏右上角三点菜单
+  final appBarActions = <Widget>[];
 
   ServerPage({Key? key}) : super(key: key);
 
@@ -212,7 +210,8 @@ class _ServerPageState extends State<ServerPage> {
                         gFFI.serverModel.isStart
                             ? ServerInfo()
                             : ServiceNotRunningNotification(),
-                        const ConnectionManager(),
+                        // DaXian: 隐藏被控时的"共享屏幕"连接管理卡片
+                        // const ConnectionManager(),
                         const PermissionChecker(),
                         SizedBox.fromSize(size: const Size(0, 15.0)),
                       ],
@@ -253,13 +252,7 @@ class ServiceNotRunningNotification extends StatelessWidget {
             ElevatedButton.icon(
                 icon: const Icon(Icons.play_arrow),
                 onPressed: () {
-                  if (gFFI.userModel.userName.value.isEmpty &&
-                      bind.mainGetLocalOption(key: "show-scam-warning") !=
-                          "N") {
-                    showScamWarning(context, serverModel);
-                  } else {
-                    serverModel.toggleService();
-                  }
+                  serverModel.toggleService();
                 },
                 label: Text(translate("Start service")))
           ],
@@ -578,6 +571,21 @@ class PermissionChecker extends StatefulWidget {
 }
 
 class _PermissionCheckerState extends State<PermissionChecker> {
+  bool _enableStartOnBoot = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadStartOnBoot();
+  }
+
+  void _loadStartOnBoot() async {
+    final enabled = await gFFI.invokeMethod(AndroidChannel.kGetStartOnBootOpt);
+    if (enabled is bool && enabled != _enableStartOnBoot) {
+      setState(() => _enableStartOnBoot = enabled);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final serverModel = Provider.of<ServerModel>(context);
@@ -598,11 +606,7 @@ class _PermissionCheckerState extends State<PermissionChecker> {
           PermissionRow(
               translate("Screen Capture"),
               serverModel.mediaOk,
-              !serverModel.mediaOk &&
-                      gFFI.userModel.userName.value.isEmpty &&
-                      bind.mainGetLocalOption(key: "show-scam-warning") != "N"
-                  ? () => showScamWarning(context, serverModel)
-                  : serverModel.toggleService),
+              serverModel.toggleService),
           PermissionRow(translate("Input Control"), serverModel.inputOk,
               serverModel.toggleInput),
           PermissionRow(translate("Transfer file"), serverModel.fileOk,
@@ -618,8 +622,29 @@ class _PermissionCheckerState extends State<PermissionChecker> {
                     style: const TextStyle(color: MyTheme.darkGray),
                   ))
                 ]),
-          PermissionRow(translate("Enable clipboard"), serverModel.clipboardOk,
-              serverModel.toggleClipboard),
+          SwitchListTile(
+              visualDensity: VisualDensity.compact,
+              contentPadding: EdgeInsets.all(0),
+              title: Text(translate('Start on boot')),
+              value: _enableStartOnBoot,
+              onChanged: (toValue) async {
+                if (toValue) {
+                  if (!await AndroidPermissionManager.check(
+                      kRequestIgnoreBatteryOptimizations)) {
+                    if (!await AndroidPermissionManager.request(
+                        kRequestIgnoreBatteryOptimizations)) {
+                      return;
+                    }
+                  }
+                  if (!await AndroidPermissionManager.check(kSystemAlertWindow)) {
+                    if (!await AndroidPermissionManager.request(kSystemAlertWindow)) {
+                      return;
+                    }
+                  }
+                }
+                setState(() => _enableStartOnBoot = toValue);
+                gFFI.invokeMethod(AndroidChannel.kSetStartOnBootOpt, toValue);
+              }),
         ]));
   }
 }

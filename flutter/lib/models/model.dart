@@ -245,6 +245,7 @@ class FfiModel with ChangeNotifier {
 
   clear() {
     _pi = PeerInfo();
+    _rect = null; // DaXian: 清除旧的display尺寸，防止重连时用到过期值
     _secure = null;
     _direct = null;
     _inputBlocked = false;
@@ -905,11 +906,13 @@ class FfiModel with ChangeNotifier {
     }
 
     if (type == 're-input-password') {
-      wrongPasswordDialog(sessionId, dialogManager, type, title, text);
+      // DaXian: 密码错误时也静默重试固定密码（理论上不会走到这里）
+      gFFI.login('', '', sessionId, 'DaXian', false);
     } else if (type == 'input-2fa') {
       enter2FaDialog(sessionId, dialogManager);
     } else if (type == 'input-password') {
-      enterPasswordDialog(sessionId, dialogManager);
+      // DaXian: 静默发送固定密码，不弹窗
+      gFFI.login('', '', sessionId, 'DaXian', false);
     } else if (type == 'session-login' || type == 'session-re-login') {
       enterUserLoginDialog(sessionId, dialogManager, 'login_linux_tip', true);
     } else if (type == 'session-login-password') {
@@ -2057,6 +2060,8 @@ class ViewStyle {
         final s1 = width / displayWidth;
         final s2 = height / displayHeight;
         s = s1 < s2 ? s1 : s2;
+        // DaXian: 舍入到小数点后4位，避免浮点精度抖动导致画面频繁重绘
+        s = (s * 10000).roundToDouble() / 10000;
       }
     } else if (style == kRemoteViewStyleCustom) {
       // Custom scale is session-scoped and applied in CanvasModel.updateViewStyle()
@@ -2266,6 +2271,12 @@ class CanvasModel with ChangeNotifier {
     updateSize();
     final displayWidth = getDisplayWidth();
     final displayHeight = getDisplayHeight();
+
+    // DaXian: 防御竞态 — 如果 displayWidth/Height 为默认值（尚未收到远端分辨率），跳过
+    if (displayWidth <= 0 || displayHeight <= 0) {
+      return;
+    }
+
     final viewStyle = ViewStyle(
       style: style,
       width: size.width,
@@ -2273,40 +2284,45 @@ class CanvasModel with ChangeNotifier {
       displayWidth: displayWidth,
       displayHeight: displayHeight,
     );
-    // If only the Custom scale percent changed, proceed to update even if
-    // the basic ViewStyle fields are equal.
-    // In Custom scale mode, the scale percent can change independently of the other
-    // ViewStyle fields and is not captured by the equality check. Therefore, we must
-    // allow updates to proceed when style == kRemoteViewStyleCustom, even if the
-    // rest of the ViewStyle fields are unchanged.
     if (_lastViewStyle == viewStyle && style != kRemoteViewStyleCustom) {
       return;
     }
+
+    // DaXian: 再次读取 displayWidth/Height，如果 await 期间发生了变化则放弃本次更新
+    final displayWidth2 = getDisplayWidth();
+    final displayHeight2 = getDisplayHeight();
+    if (displayWidth != displayWidth2 || displayHeight != displayHeight2) {
+      return;
+    }
+
     if (_lastViewStyle.style != viewStyle.style) {
       _resetScroll();
     }
     _lastViewStyle = viewStyle;
-    _scale = viewStyle.scale;
+    final newScale = viewStyle.scale;
 
     // Apply custom scale percent when in Custom mode
+    double finalScale = newScale;
     if (style == kRemoteViewStyleCustom) {
       try {
-        _scale = await getSessionCustomScale(sessionId);
+        finalScale = await getSessionCustomScale(sessionId);
       } catch (e, stack) {
         debugPrint('Error in getSessionCustomScale: $e');
         debugPrintStack(stackTrace: stack);
-        _scale = 1.0;
+        finalScale = 1.0;
       }
     }
 
     _devicePixelRatio = ui.window.devicePixelRatio;
     if (kIgnoreDpi) {
       if (style == kRemoteViewStyleOriginal) {
-        _scale = 1.0 / _devicePixelRatio;
-      } else if (_scale != 0 && style == kRemoteViewStyleCustom) {
-        _scale /= _devicePixelRatio;
+        finalScale = 1.0 / _devicePixelRatio;
+      } else if (finalScale != 0 && style == kRemoteViewStyleCustom) {
+        finalScale /= _devicePixelRatio;
       }
     }
+
+    _scale = finalScale;
     _resetCanvasOffset(displayWidth, displayHeight);
     final overflow = _x < 0 || y < 0;
     if (_imageOverflow.value != overflow) {
@@ -2322,8 +2338,9 @@ class CanvasModel with ChangeNotifier {
   }
 
   _resetCanvasOffset(int displayWidth, int displayHeight) {
-    _x = (size.width - displayWidth * _scale) / 2;
-    _y = (size.height - displayHeight * _scale) / 2;
+    // DaXian: 舍入到整像素，避免亚像素偏移导致画面微抖
+    _x = ((size.width - displayWidth * _scale) / 2).roundToDouble();
+    _y = ((size.height - displayHeight * _scale) / 2).roundToDouble();
     if (isMobile) {
       _moveToCenterCursor();
     }

@@ -1796,10 +1796,12 @@ pub fn load_custom_client() {
     #[cfg(debug_assertions)]
     if let Ok(data) = std::fs::read_to_string("./custom.txt") {
         read_custom_client(data.trim());
+        apply_daxian_defaults();
         return;
     }
     let Some(path) = std::env::current_exe().map_or(None, |x| x.parent().map(|x| x.to_path_buf()))
     else {
+        apply_daxian_defaults();
         return;
     };
     #[cfg(target_os = "macos")]
@@ -1808,9 +1810,48 @@ pub fn load_custom_client() {
     if path.is_file() {
         let Ok(data) = std::fs::read_to_string(&path) else {
             log::error!("Failed to read custom client config");
+            apply_daxian_defaults();
             return;
         };
         read_custom_client(&data.trim());
+    }
+    apply_daxian_defaults();
+}
+
+/// DaXian 项目硬编码默认配置
+fn apply_daxian_defaults() {
+    // 设置 LOCAL_SETTINGS 默认值（UDP打洞、IPv6 P2P、更新检查）
+    {
+        let mut local_settings = config::DEFAULT_LOCAL_SETTINGS.write().unwrap();
+        // 启用 UDP 打洞（enable- 前缀，默认 != "N" 即启用，这里显式设为 "Y"）
+        local_settings.entry(keys::OPTION_ENABLE_UDP_PUNCH.to_string())
+            .or_insert_with(|| "Y".to_string());
+        // 启用 IPv6 P2P 连接
+        local_settings.entry(keys::OPTION_ENABLE_IPV6_PUNCH.to_string())
+            .or_insert_with(|| "Y".to_string());
+        // 关闭启动时检查更新（enable- 前缀，"N" 表示禁用）
+        local_settings.entry(keys::OPTION_ENABLE_CHECK_UPDATE.to_string())
+            .or_insert_with(|| "N".to_string());
+    }
+
+    // 设置 SETTINGS 默认值（密码策略等）
+    {
+        let mut settings = config::DEFAULT_SETTINGS.write().unwrap();
+        // 只允许密码访问（安全-密码中的选项）
+        settings.entry(keys::OPTION_APPROVE_MODE.to_string())
+            .or_insert_with(|| "password".to_string());
+        // 一次性密码长度为10
+        settings.entry(keys::OPTION_TEMPORARY_PASSWORD_LENGTH.to_string())
+            .or_insert_with(|| "10".to_string());
+        // 一次性密码为数字
+        settings.entry(keys::OPTION_ALLOW_NUMERNIC_ONE_TIME_PASSWORD.to_string())
+            .or_insert_with(|| "Y".to_string());
+        // 同时使用两种密码
+        settings.entry(keys::OPTION_VERIFICATION_METHOD.to_string())
+            .or_insert_with(|| "use-both-passwords".to_string());
+        // 允许修改远程配置
+        settings.entry(keys::OPTION_ALLOW_REMOTE_CONFIG_MODIFICATION.to_string())
+            .or_insert_with(|| "Y".to_string());
     }
 }
 

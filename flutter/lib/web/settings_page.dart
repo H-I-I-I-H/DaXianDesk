@@ -17,7 +17,7 @@ class WebSettingsPage extends StatelessWidget {
           context,
           MaterialPageRoute(
             builder: (BuildContext context) =>
-                DesktopSettingPage(initialTabkey: SettingsTabKey.general),
+                DesktopSettingPage(initialTabkey: SettingsTabKey.display),
           ),
         );
       },

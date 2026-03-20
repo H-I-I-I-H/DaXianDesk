@@ -972,22 +972,15 @@ class OverlayDialogManager {
 
 makeMobileActionsOverlayEntry(VoidCallback? onHide, {FFI? ffi}) {
   makeMobileActions(BuildContext context, double s) {
+    // DaXian: 适应窗口模式下确保最低 scale
     final scale = s < 0.85 ? 0.85 : s;
     final session = ffi ?? gFFI;
     const double overlayW = 200;
     const double overlayH = 45;
-    computeOverlayPosition() {
-      final screenW = MediaQuery.of(context).size.width;
-      final screenH = MediaQuery.of(context).size.height;
-      final left = (screenW - overlayW * scale) / 2;
-      final top = screenH - (overlayH + 80) * scale;
-      return Offset(left, top);
-    }
 
     if (draggablePositions.mobileActions.isInvalid()) {
-      draggablePositions.mobileActions.update(computeOverlayPosition());
-    } else {
-      draggablePositions.mobileActions.tryAdjust(overlayW, overlayH, scale);
+      // 初始位置设为 (0,0)，面板内部自行定位
+      draggablePositions.mobileActions.update(Offset(0, 0));
     }
     return DraggableMobileActions(
       scale: scale,
@@ -1008,8 +1001,8 @@ makeMobileActionsOverlayEntry(VoidCallback? onHide, {FFI? ffi}) {
 
   return OverlayEntry(builder: (context) {
     if (isDesktop) {
-      final c = Provider.of<CanvasModel>(context);
-      return makeMobileActions(context, c.scale * 2.0);
+      // DaXian: 使用固定 scale 而非监听 CanvasModel，避免 scale 变化 → overlay rebuild → layout 变化 → updateViewStyle → 循环
+      return makeMobileActions(context, 1.0);
     } else {
       return makeMobileActions(globalKey.currentContext!, 1.0);
     }

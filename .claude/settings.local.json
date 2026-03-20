@@ -3,7 +3,14 @@
     "allow": [
       "Bash(find /c/Users/Administrator/Desktop/DaXian/Dev/DaXianDesk -type f \\\\\\(-name build.py -o -name build.rs -o -name Dockerfile -o -name docker-compose* -o -name Makefile -o -name .cargo -o -name *.sh -o -name *.bat -o -name *.ps1 -o -name *.nsi -o -name *.wxs \\\\\\) -o -path */.github/workflows/* -type f)",
       "Bash(find c:UsersAdministratorDesktopDaXianDevDaXianDeskflutterios -type f -name *.plist -o -name *.swift -o -name *.h)",
-      "Bash(grep -E \"\\\\.rs$\")"
+      "Bash(grep -E \"\\\\.rs$\")",
+      "Bash(grep -r \"is_public\\\\|daxian\" C:UsersAdministratorDesktopDaXianDevDaXianDesk/src --include=*.rs)",
+      "Bash(find /c/Users/Administrator/Desktop/DaXian/Dev/DaXianDesk -maxdepth 2 -name .github -o -name .gitlab-ci.yml -o -name *.yml -type f)",
+      "Bash(grep -r 'class MyTheme' C:/Users/Administrator/Desktop/DaXian/Dev/DaXianDesk/flutter/lib --include=*.dart)",
+      "Bash(git:*)",
+      "Bash(find /c/Users/Administrator/Desktop/DaXian/Dev/DaXianDesk -name *.proto)",
+      "Bash(find C:/Users/Administrator/Desktop/DaXian/Dev/DaXianDesk -type f -name *.arb)",
+      "Bash(grep -E \"\\\\.\\(toml|py|sh|yml|yaml|env|json\\)$\")"
     ]
   }
 }

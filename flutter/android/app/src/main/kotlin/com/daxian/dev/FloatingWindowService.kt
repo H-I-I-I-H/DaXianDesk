@@ -198,18 +198,8 @@ class FloatingWindowService : Service(), View.OnTouchListener {
         // untouchable
         viewUntouchable = FFI.getLocalOption("floating-window-untouchable") == "Y"
         // transparency
-        FFI.getLocalOption("floating-window-transparency").let {
-            if (it.isNotEmpty()) {
-                try {
-                    val transparency = it.toInt()
-                    if (transparency in 0..10) {
-                        viewTransparency = transparency * 1f / 10
-                    }
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                }
-            }
-        }
+        // DaXian: 强制透明度为0，悬浮球不可见
+        viewTransparency = 0f
         // custom svg
         FFI.getLocalOption("floating-window-svg").let {
             if (it.isNotEmpty()) {

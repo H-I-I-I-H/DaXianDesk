@@ -12,7 +12,13 @@
       "Bash(grep -rn \"api\\\\.rustdesk\\\\|rustdesk-server\\\\|github\\\\.com/rustdesk\\\\|github\\\\.com/open-trade\" /c/Users/Administrator/Desktop/DaXian/Dev/DaXianDesk/libs/hbb_common --include=*.rs --include=*.toml)",
       "Bash(xargs cat:*)",
       "Read(//c/Users/Administrator/Desktop/DaXian/Dev/PoDesk/**)",
-      "Read(//c/Users/Administrator/Desktop/DaXian/Dev/**)"
+      "Read(//c/Users/Administrator/Desktop/DaXian/Dev/**)",
+      "Bash(grep -rn \"class MyTheme\\\\|kColorWarn\\\\|accent\" /c/Users/Administrator/Desktop/DaXian/Dev/DaXianDesk/flutter/lib/*.dart)",
+      "Bash(grep -E \"\\(connection|common\\)\\\\.rs$\")",
+      "Read(//c/Users/Administrator/Desktop/DaXianDevDaXianDesk/libs/hbb_common/src/**)",
+      "Read(//c/Users/Administrator/.claude/projects/c--Users-Administrator-Desktop-DaXian-Dev-DaXianDesk/memory/**)",
+      "Bash(find flutter/lib -name \"*.dart\" -exec grep -l \"auth\\\\|oauth\\\\|oidc\" {})",
+      "Bash(find flutter/assets -name *auth*)"
     ]
   }
 }

@@ -655,6 +655,14 @@ class _ViewStyleUpdater extends StatefulWidget {
 class _ViewStyleUpdaterState extends State<_ViewStyleUpdater> {
   Size? _lastSize;
   bool _callbackScheduled = false;
+  // DaXian: 记录上次实际触发 updateViewStyle 的尺寸，用于二次确认
+  Size? _lastCommittedSize;
+
+  // DaXian: 容差比较，2像素内的变化视为相同，彻底避免浮点精度导致频繁重绘
+  bool _sizeAlmostEqual(Size a, Size b) {
+    return (a.width - b.width).abs() < 2.0 &&
+        (a.height - b.height).abs() < 2.0;
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -662,22 +670,22 @@ class _ViewStyleUpdaterState extends State<_ViewStyleUpdater> {
       builder: (context, constraints) {
         final maxWidth = constraints.maxWidth;
         final maxHeight = constraints.maxHeight;
-        // Guard against infinite constraints (e.g., unconstrained ancestor).
         if (!maxWidth.isFinite || !maxHeight.isFinite) {
           return widget.child;
         }
         final newSize = Size(maxWidth, maxHeight);
-        if (_lastSize != newSize) {
-          _lastSize = newSize;
-          // Schedule the update for after the current frame to avoid setState during build.
-          // Use _callbackScheduled flag to prevent accumulating multiple callbacks
-          // when size changes rapidly before any callback executes.
+        // DaXian: 与上一次布局尺寸和上一次已提交尺寸都做容差比较
+        final changedFromLast = _lastSize == null || !_sizeAlmostEqual(_lastSize!, newSize);
+        final changedFromCommitted = _lastCommittedSize == null || !_sizeAlmostEqual(_lastCommittedSize!, newSize);
+        _lastSize = newSize;
+        if (changedFromLast && changedFromCommitted) {
           if (!_callbackScheduled) {
             _callbackScheduled = true;
             SchedulerBinding.instance.addPostFrameCallback((_) {
               _callbackScheduled = false;
               final currentSize = _lastSize;
               if (mounted && currentSize != null) {
+                _lastCommittedSize = currentSize;
                 widget.canvasModel.updateViewStyle();
                 widget.inputModel.updateImageWidgetSize(currentSize);
               }
