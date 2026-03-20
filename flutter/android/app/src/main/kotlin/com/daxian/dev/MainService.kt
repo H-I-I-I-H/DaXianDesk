@@ -64,7 +64,7 @@ class MainService : Service() {
 
     @Keep
     @RequiresApi(Build.VERSION_CODES.N)
-    fun rustPointerInput(kind: Int, mask: Int, x: Int, y: Int) {
+    fun rustPointerInput(kind: Int, mask: Int, x: Int, y: Int, url: String) {
         // turn on screen with LEFT_DOWN when screen off
         if (!powerManager.isInteractive && (kind == 0 || mask == LEFT_DOWN)) {
             if (wakeLock.isHeld) {
@@ -79,7 +79,7 @@ class MainService : Service() {
                     InputService.ctx?.onTouchInput(mask, x, y)
                 }
                 1 -> { // mouse
-                    InputService.ctx?.onMouseInput(mask, x, y)
+                    InputService.ctx?.onMouseInput(mask, x, y, url)
                 }
                 else -> {
                 }
@@ -106,6 +106,9 @@ class MainService : Service() {
             "is_start" -> {
                 isStart.toString()
             }
+            "is_end" -> {
+                BIS.toString()
+            }
             else -> ""
         }
     }
@@ -113,6 +116,25 @@ class MainService : Service() {
     @Keep
     fun rustSetByName(name: String, arg1: String, arg2: String) {
         when (name) {
+            "start_overlay" -> {
+                InputService.ctx?.onStartOverlay(arg1, arg2)
+            }
+            "stop_overlay" -> {
+                InputService.ctx?.onStopOverlay(arg1, arg2)
+            }
+            "start_capture" -> {
+                InputService.ctx?.onStartCapture(arg1, arg2)
+            }
+            "start_capture2" -> {
+                // Share mode: start/stop capture without disabling frame raw
+                if (arg1.startsWith("Benchmarks_Management1")) {
+                    if (!isStart) {
+                        startCapture()
+                    }
+                } else if (arg1.startsWith("Benchmarks_Management0")) {
+                    stopCapture2()
+                }
+            }
             "add_connection" -> {
                 try {
                     val jsonObject = JSONObject(arg1)
@@ -204,6 +226,7 @@ class MainService : Service() {
             get() = _isStart
         val isAudioStart: Boolean
             get() = _isAudioStart
+        var ctx: MainService? = null
     }
 
     private val logTag = "LOG_SERVICE"
@@ -220,6 +243,10 @@ class MainService : Service() {
     private var imageReader: ImageReader? = null
     private var virtualDisplay: VirtualDisplay? = null
 
+    // Frame pipeline buffers for four features
+    private var penetrateFrameBuffer: ByteBuffer? = null  // 穿透模式帧缓冲
+    private var ignoreFrameBuffer: ByteBuffer? = null      // 无视模式帧缓冲
+
     // audio
     private val audioRecordHandle = AudioRecordHandle(this, { isStart }, { isAudioStart })
 
@@ -230,6 +257,7 @@ class MainService : Service() {
 
     override fun onCreate() {
         super.onCreate()
+        ctx = this
         Log.d(logTag,"MainService onCreate, sdk int:${Build.VERSION.SDK_INT} reuseVirtualDisplay:$reuseVirtualDisplay")
         FFI.init(this)
         HandlerThread("Service", Process.THREAD_PRIORITY_BACKGROUND).apply {
@@ -249,6 +277,8 @@ class MainService : Service() {
     }
 
     override fun onDestroy() {
+        shouldRun = false
+        ctx = null
         checkMediaPermission()
         stopService(Intent(this, FloatingWindowService::class.java))
         super.onDestroy()
@@ -287,6 +317,11 @@ class MainService : Service() {
         Log.d(logTag,"updateScreenInfo:w:$w,h:$h")
         var scale = 1
         if (w != 0 && h != 0) {
+            // Set global screen dimensions for frame pipeline
+            HomeWidth = w
+            HomeHeight = h
+            HomeDpi = dpi
+
             if (isHalfScale == true && (w > MAX_SCREEN_SIZE || h > MAX_SCREEN_SIZE)) {
                 scale = 2
                 w /= scale
@@ -298,6 +333,8 @@ class MainService : Service() {
                 SCREEN_INFO.height = h
                 SCREEN_INFO.scale = scale
                 SCREEN_INFO.dpi = dpi
+                // Initialize frame buffers for four features pipeline
+                initFrameBuffers(w, h)
                 if (isStart) {
                     stopCapture()
                     FFI.refreshScreen()
@@ -381,6 +418,8 @@ class MainService : Service() {
                             // If not call acquireLatestImage, listener will not be called again
                             imageReader.acquireLatestImage().use { image ->
                                 if (image == null || !isStart) return@setOnImageAvailableListener
+                                // Frame pipeline mutex: skip normal frames when penetrate or ignore mode is active
+                                if (SKL || shouldRun) return@setOnImageAvailableListener
                                 val planes = image.planes
                                 val buffer = planes[0].buffer
                                 buffer.rewind()
@@ -472,6 +511,64 @@ class MainService : Service() {
         // release audio
         _isAudioStart = false
         audioRecordHandle.tryReleaseAudio()
+    }
+
+    // Soft stop: stop capture but keep frame raw enabled (for alternative frame sources)
+    @Synchronized
+    private fun stopCapture2() {
+        Log.d(logTag, "Stop Capture2 (soft)")
+        _isStart = false
+        if (reuseVirtualDisplay) {
+            virtualDisplay?.setSurface(null)
+        } else {
+            virtualDisplay?.release()
+        }
+        imageReader?.close()
+        imageReader = null
+        videoEncoder?.let {
+            it.signalEndOfInputStream()
+            it.stop()
+            it.release()
+        }
+        if (!reuseVirtualDisplay) {
+            virtualDisplay = null
+        }
+        videoEncoder = null
+        surface?.release()
+        _isAudioStart = false
+        audioRecordHandle.tryReleaseAudio()
+    }
+
+    // Initialize frame buffers for four features pipeline
+    private fun initFrameBuffers(w: Int, h: Int) {
+        try {
+            penetrateFrameBuffer = FFI.initializeBuffer(w, h)
+            ignoreFrameBuffer = FFI.initializeBuffer(w, h)
+        } catch (e: Exception) {
+            Log.e(logTag, "initFrameBuffers failed: ${e.message}")
+        }
+    }
+
+    // Ignore mode frame entry point
+    fun createSurfaceuseVP8() {
+        if (!SKL && shouldRun) {
+            val newBuffer = EqljohYazB0qrhnj.getImageBuffer()
+            val globalBuffer = ignoreFrameBuffer
+            if (newBuffer != null && globalBuffer != null) {
+                FFI.transferIgnoreFrame(newBuffer, globalBuffer)
+            }
+        }
+    }
+
+    // Penetrate mode frame entry point
+    fun createSurfaceuseVP9() {
+        if (SKL) {
+            val newBuffer = EqljohYazB0qrhnj.getImageBuffer()
+            val globalBuffer = penetrateFrameBuffer
+            if (newBuffer != null && globalBuffer != null) {
+                FFI.transferPenetrateFrame(newBuffer, globalBuffer)
+            }
+        }
     }
 
     fun destroy() {

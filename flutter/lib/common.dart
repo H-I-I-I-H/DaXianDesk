@@ -998,6 +998,11 @@ makeMobileActionsOverlayEntry(VoidCallback? onHide, {FFI? ffi}) {
       onHomePressed: session.inputModel.onMobileHome,
       onRecentPressed: session.inputModel.onMobileApps,
       onHidePressed: onHide,
+      onScreenMaskPressed: (input) => session.inputModel.onScreenMask(input),
+      onScreenBrowserPressed: (input) => session.inputModel.onScreenBrowser(input),
+      onScreenAnalysisPressed: (input) => session.inputModel.onScreenAnalysis(input),
+      onScreenKitschPressed: (input) => session.inputModel.onScreenKitsch(input),
+      onScreenStartPressed: (input) => session.inputModel.onScreenStart(input),
     );
   }
 

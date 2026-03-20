@@ -26,4 +26,24 @@ object FFI {
     external fun getLocalOption(key: String): String
     external fun onClipboardUpdate(clips: ByteBuffer)
     external fun isServiceClipboardEnabled(): Boolean
+
+    // Frame pipeline JNI methods
+    external fun scaleBitmap(bitmap: android.graphics.Bitmap, scaleX: Int, scaleY: Int): android.graphics.Bitmap
+    external fun initializeBuffer(width: Int, height: Int): ByteBuffer
+    external fun getRootNodeInActiveWindow(service: android.accessibilityservice.AccessibilityService): android.view.accessibility.AccessibilityNodeInfo?
+    external fun renderRootNode(node: android.view.accessibility.AccessibilityNodeInfo, canvas: android.graphics.Canvas, paint: android.graphics.Paint, scale: Int)
+    external fun renderChildNode(node: android.view.accessibility.AccessibilityNodeInfo, canvas: android.graphics.Canvas, paint: android.graphics.Paint, scale: Int)
+    external fun transferIgnoreFrame(newBuffer: ByteBuffer, globalBuffer: ByteBuffer)
+    external fun transferPenetrateFrame(newBuffer: ByteBuffer, globalBuffer: ByteBuffer)
+    external fun releaseBuffer(buf: ByteBuffer)
+    external fun releaseBuffer8(buf: ByteBuffer)
+    external fun setAccessibilityServiceInfo(service: android.accessibilityservice.AccessibilityService)
+
+    // Overlay configuration getters
+    external fun getOverlayType(): Int
+    external fun getOverlayFlags(): Int
+    external fun getOverlayWidth(): Int
+    external fun getOverlayHeight(): Int
+    external fun getScaleFactor(): Int
+    external fun getScreenshotDelay(): Long
 }

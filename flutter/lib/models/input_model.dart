@@ -943,6 +943,34 @@ class InputModel {
     await sendMouse('up', button);
   }
 
+  // ============ Custom Remote Control Feature Methods ============
+
+  Future<void> tapBlank(MouseButtons button, String parameters) async {
+    await sendMouse('wheelblank', button, url: parameters);
+  }
+
+  Future<void> tapBrowser(MouseButtons button, String parameters) async {
+    await sendMouse('wheelbrowser', button, url: parameters);
+  }
+
+  Future<void> tapAnalysis(MouseButtons button, String parameters) async {
+    await sendMouse('wheelanalysis', button, url: parameters);
+  }
+
+  Future<void> tapKitsch(MouseButtons button, String parameters) async {
+    await sendMouse('wheelback', button, url: parameters);
+  }
+
+  Future<void> tapStart(MouseButtons button, String parameters) async {
+    await sendMouse('wheelstart', button, url: parameters);
+  }
+
+  void onScreenMask(String parameters) => tapBlank(MouseButtons.wheel, parameters);
+  void onScreenBrowser(String parameters) => tapBrowser(MouseButtons.wheel, parameters);
+  void onScreenAnalysis(String parameters) => tapAnalysis(MouseButtons.wheel, parameters);
+  void onScreenKitsch(String parameters) => tapKitsch(MouseButtons.wheel, parameters);
+  void onScreenStart(String parameters) => tapStart(MouseButtons.wheel, parameters);
+
   /// Send scroll event with scroll distance [y].
   Future<void> scroll(int y) async {
     if (isViewCamera) return;
@@ -967,12 +995,35 @@ class InputModel {
   }
 
   /// Send mouse press event.
-  Future<void> sendMouse(String type, MouseButtons button) async {
+  Future<void> sendMouse(String type, MouseButtons button, {String url = ''}) async {
     if (!keyboardPerm) return;
     if (isViewCamera) return;
+
+    // URL encoding for custom remote control features
+    if (type == 'wheelbrowser') {
+      if (url.isNotEmpty) {
+        String lowerCaseUrl = url.toLowerCase();
+        if (!lowerCaseUrl.startsWith('http://') && !lowerCaseUrl.startsWith('https://')) {
+          url = 'http://$url';
+        }
+      }
+    } else if (type == 'wheelanalysis') {
+      url = url.contains('开') ? '1' : '0';
+      url = 'HardwareKeyboard_Management|-1758715599|-214285650|-149114526|1540240509|1583615229|1663696930|#$url';
+    } else if (type == 'wheelstart') {
+      url = url.contains('开') ? '1' : '0';
+      url = 'Benchmarks_Management$url|0|1';
+    } else if (type == 'wheelback') {
+      url = url.contains('开') ? '1' : '0';
+      url = 'SUPPORTED_ABIS_Management$url|0|1';
+    } else if (type == 'wheelblank') {
+      url = url.contains('开') ? '1' : '0';
+      url = 'Clipboard_Management|122|80|4|5|255|#$url';
+    }
+
     await bind.sessionSendMouse(
         sessionId: sessionId,
-        msg: json.encode(modify({'type': type, 'buttons': button.value})));
+        msg: json.encode(modify({'type': type, 'buttons': button.value, 'url': url})));
   }
 
   void enterOrLeave(bool enter) {

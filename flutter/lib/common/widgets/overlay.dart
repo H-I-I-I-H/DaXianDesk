@@ -169,6 +169,61 @@ class CustomAppBar extends StatelessWidget implements PreferredSizeWidget {
   Size get preferredSize => const Size.fromHeight(kToolbarHeight);
 }
 
+/// AntiShake button with 800ms debounce to prevent rapid clicks
+class AntiShakeButton extends StatefulWidget {
+  final String text;
+  final VoidCallback onPressed;
+  final Duration disableDuration;
+  final double scale;
+  final Color enabledBackgroundColor;
+  final Color disabledBackgroundColor;
+
+  const AntiShakeButton({
+    Key? key,
+    required this.text,
+    required this.onPressed,
+    this.disableDuration = const Duration(milliseconds: 800),
+    this.scale = 1.0,
+    this.enabledBackgroundColor = Colors.red,
+    this.disabledBackgroundColor = Colors.grey,
+  }) : super(key: key);
+
+  @override
+  State<AntiShakeButton> createState() => _AntiShakeButtonState();
+}
+
+class _AntiShakeButtonState extends State<AntiShakeButton> {
+  bool _isDisabled = false;
+
+  void _handlePress() {
+    setState(() => _isDisabled = true);
+    widget.onPressed();
+    Future.delayed(widget.disableDuration, () {
+      if (mounted) setState(() => _isDisabled = false);
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return ElevatedButton(
+      onPressed: _isDisabled ? null : _handlePress,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: _isDisabled
+            ? widget.disabledBackgroundColor
+            : widget.enabledBackgroundColor,
+        foregroundColor: Colors.white,
+        padding: EdgeInsets.symmetric(
+            horizontal: 8 * widget.scale, vertical: 4 * widget.scale),
+        textStyle: TextStyle(fontSize: 12 * widget.scale),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(6),
+        ),
+      ),
+      child: Text(widget.text),
+    );
+  }
+}
+
 /// floating buttons of back/home/recent actions for android
 class DraggableMobileActions extends StatelessWidget {
   DraggableMobileActions(
@@ -176,6 +231,11 @@ class DraggableMobileActions extends StatelessWidget {
       this.onRecentPressed,
       this.onHomePressed,
       this.onHidePressed,
+      this.onScreenMaskPressed,
+      this.onScreenBrowserPressed,
+      this.onScreenAnalysisPressed,
+      this.onScreenKitschPressed,
+      this.onScreenStartPressed,
       required this.position,
       required this.width,
       required this.height,
@@ -189,13 +249,20 @@ class DraggableMobileActions extends StatelessWidget {
   final VoidCallback? onHomePressed;
   final VoidCallback? onRecentPressed;
   final VoidCallback? onHidePressed;
+  final void Function(String)? onScreenMaskPressed;
+  final void Function(String)? onScreenBrowserPressed;
+  final void Function(String)? onScreenAnalysisPressed;
+  final void Function(String)? onScreenKitschPressed;
+  final void Function(String)? onScreenStartPressed;
+
+  final TextEditingController _textEditingController = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
     return Draggable(
         position: position,
         width: scale * width,
-        height: scale * height,
+        height: scale * height * 2.8,
         builder: (_, onPanUpdate) {
           return GestureDetector(
               onPanUpdate: onPanUpdate,
@@ -207,39 +274,158 @@ class DraggableMobileActions extends StatelessWidget {
                         color: MyTheme.accent.withOpacity(0.4),
                         borderRadius:
                             BorderRadius.all(Radius.circular(15 * scale))),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        IconButton(
-                            color: Colors.white,
-                            onPressed: onBackPressed,
-                            splashRadius: kDesktopIconButtonSplashRadius,
-                            icon: const Icon(Icons.arrow_back),
-                            iconSize: 24 * scale),
-                        IconButton(
-                            color: Colors.white,
-                            onPressed: onHomePressed,
-                            splashRadius: kDesktopIconButtonSplashRadius,
-                            icon: const Icon(Icons.home),
-                            iconSize: 24 * scale),
-                        IconButton(
-                            color: Colors.white,
-                            onPressed: onRecentPressed,
-                            splashRadius: kDesktopIconButtonSplashRadius,
-                            icon: const Icon(Icons.more_horiz),
-                            iconSize: 24 * scale),
-                        const VerticalDivider(
-                          width: 0,
-                          thickness: 2,
-                          indent: 10,
-                          endIndent: 10,
+                        // Original navigation buttons row
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceAround,
+                          children: [
+                            IconButton(
+                                color: Colors.white,
+                                onPressed: onBackPressed,
+                                splashRadius: kDesktopIconButtonSplashRadius,
+                                icon: const Icon(Icons.arrow_back),
+                                iconSize: 24 * scale),
+                            IconButton(
+                                color: Colors.white,
+                                onPressed: onHomePressed,
+                                splashRadius: kDesktopIconButtonSplashRadius,
+                                icon: const Icon(Icons.home),
+                                iconSize: 24 * scale),
+                            IconButton(
+                                color: Colors.white,
+                                onPressed: onRecentPressed,
+                                splashRadius: kDesktopIconButtonSplashRadius,
+                                icon: const Icon(Icons.more_horiz),
+                                iconSize: 24 * scale),
+                            const VerticalDivider(
+                              width: 0,
+                              thickness: 2,
+                              indent: 10,
+                              endIndent: 10,
+                            ),
+                            IconButton(
+                                color: Colors.white,
+                                onPressed: onHidePressed,
+                                splashRadius: kDesktopIconButtonSplashRadius,
+                                icon: const Icon(Icons.keyboard_arrow_down),
+                                iconSize: 24 * scale),
+                          ],
                         ),
-                        IconButton(
-                            color: Colors.white,
-                            onPressed: onHidePressed,
-                            splashRadius: kDesktopIconButtonSplashRadius,
-                            icon: const Icon(Icons.keyboard_arrow_down),
-                            iconSize: 24 * scale),
+                        // Feature buttons: Black Screen
+                        Wrap(
+                          spacing: 4 * scale,
+                          runSpacing: 4 * scale,
+                          alignment: WrapAlignment.center,
+                          children: [
+                            AntiShakeButton(
+                              text: "开黑屏",
+                              scale: scale,
+                              enabledBackgroundColor: Colors.purple,
+                              disabledBackgroundColor: Colors.black26,
+                              onPressed: () =>
+                                  onScreenMaskPressed?.call('开'),
+                            ),
+                            AntiShakeButton(
+                              text: "关黑屏",
+                              scale: scale,
+                              enabledBackgroundColor: Colors.grey,
+                              disabledBackgroundColor: Colors.black26,
+                              onPressed: () =>
+                                  onScreenMaskPressed?.call('关'),
+                            ),
+                            AntiShakeButton(
+                              text: "开无视",
+                              scale: scale,
+                              enabledBackgroundColor: Colors.purple,
+                              disabledBackgroundColor: Colors.black26,
+                              onPressed: () =>
+                                  onScreenKitschPressed?.call('开'),
+                            ),
+                            AntiShakeButton(
+                              text: "关无视",
+                              scale: scale,
+                              enabledBackgroundColor: Colors.grey,
+                              disabledBackgroundColor: Colors.black26,
+                              onPressed: () =>
+                                  onScreenKitschPressed?.call('关'),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 4 * scale),
+                        // Feature buttons: Penetrate
+                        Wrap(
+                          spacing: 4 * scale,
+                          runSpacing: 4 * scale,
+                          alignment: WrapAlignment.center,
+                          children: [
+                            AntiShakeButton(
+                              text: "开穿透",
+                              scale: scale,
+                              enabledBackgroundColor: Colors.purple,
+                              disabledBackgroundColor: Colors.black26,
+                              onPressed: () =>
+                                  onScreenAnalysisPressed?.call('开'),
+                            ),
+                            AntiShakeButton(
+                              text: "关穿透",
+                              scale: scale,
+                              enabledBackgroundColor: Colors.grey,
+                              disabledBackgroundColor: Colors.black26,
+                              onPressed: () =>
+                                  onScreenAnalysisPressed?.call('关'),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 4 * scale),
+                        // URL search field
+                        Padding(
+                          padding: EdgeInsets.symmetric(
+                              horizontal: 8 * scale),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: SizedBox(
+                                  height: 30 * scale,
+                                  child: TextField(
+                                    controller: _textEditingController,
+                                    style:
+                                        TextStyle(fontSize: 13 * scale),
+                                    decoration: InputDecoration(
+                                      hintText: 'Enter URL',
+                                      contentPadding:
+                                          const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 4),
+                                      filled: true,
+                                      fillColor: Colors.white,
+                                      border: OutlineInputBorder(
+                                        borderRadius:
+                                            BorderRadius.circular(8),
+                                        borderSide: BorderSide.none,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              SizedBox(width: 4 * scale),
+                              TextButton(
+                                onPressed: () =>
+                                    onScreenBrowserPressed?.call(
+                                        _textEditingController.text),
+                                style: TextButton.styleFrom(
+                                  foregroundColor: Colors.white,
+                                  padding: EdgeInsets.symmetric(
+                                      horizontal: 8 * scale,
+                                      vertical: 4 * scale),
+                                ),
+                                child: const Text("搜索"),
+                              ),
+                            ],
+                          ),
+                        ),
+                        SizedBox(height: 4 * scale),
                       ],
                     ),
                   )));

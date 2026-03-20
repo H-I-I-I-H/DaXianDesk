@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /c/Users/Administrator/Desktop/DaXian/Dev/DaXianDesk -type f \\\\\\(-name build.py -o -name build.rs -o -name Dockerfile -o -name docker-compose* -o -name Makefile -o -name .cargo -o -name *.sh -o -name *.bat -o -name *.ps1 -o -name *.nsi -o -name *.wxs \\\\\\) -o -path */.github/workflows/* -type f)",
+      "Bash(find c:UsersAdministratorDesktopDaXianDevDaXianDeskflutterios -type f -name *.plist -o -name *.swift -o -name *.h)",
+      "Bash(grep -E \"\\\\.rs$\")"
+    ]
+  }
+}

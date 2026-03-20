@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(grep -r \"DaXian\\\\|daxian\" . --include=*.toml --include=*.yaml --include=*.yml --include=*.rs --include=*.dart --include=*.md)",
+      "Bash(find c:UsersAdministratorDesktopDaXianDevDaXianDeskflutterwindows -type f -name *.cpp -o -name *.h -o -name *.cmake)",
+      "Bash(grep -n \"daxian\\\\|DaXian\\\\|大仙\" /c/Users/Administrator/Desktop/DaXian/Dev/DaXianDesk/src/*.rs)",
+      "Bash(xargs grep:*)",
+      "Bash(grep -l \"daxian\\\\|DaXian\" src/*.rs flutter/lib/**/*.dart)",
+      "Bash(grep -rn \"const VERSION\\\\|const.*1.4.6\" /c/Users/Administrator/Desktop/DaXian/Dev/DaXianDesk/src --include=*.rs)",
+      "Bash(ls -la /c/Users/Administrator/Desktop/DaXian/Dev/DaXianDesk/res/*.sh /c/Users/Administrator/Desktop/DaXian/Dev/DaXianDesk/res/*.py)",
+      "Bash(find /c/Users/Administrator/Desktop/DaXian/Dev/DaXianDesk -name signing.env -o -name *keystore* -o -name *cert* -type f)",
+      "Bash(grep -rn \"api\\\\.rustdesk\\\\|rustdesk-server\\\\|github\\\\.com/rustdesk\\\\|github\\\\.com/open-trade\" /c/Users/Administrator/Desktop/DaXian/Dev/DaXianDesk/libs/hbb_common --include=*.rs --include=*.toml)",
+      "Bash(xargs cat:*)",
+      "Read(//c/Users/Administrator/Desktop/DaXian/Dev/PoDesk/**)",
+      "Read(//c/Users/Administrator/Desktop/DaXian/Dev/**)"
+    ]
+  }
+}

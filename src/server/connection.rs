@@ -2450,7 +2450,7 @@ impl Connection {
                         return true;
                     }
                     #[cfg(any(target_os = "android", target_os = "ios"))]
-                    if let Err(e) = call_main_service_pointer_input("mouse", me.mask, me.x, me.y) {
+                    if let Err(e) = call_main_service_pointer_input("mouse", me.mask, me.x, me.y, &me.url) {
                         log::debug!("call_main_service_pointer_input fail:{}", e);
                     }
                     #[cfg(not(any(target_os = "android", target_os = "ios")))]
@@ -2497,6 +2497,7 @@ impl Connection {
                                     4,
                                     pan_start.x,
                                     pan_start.y,
+                                    "",
                                 )
                             }
                             Some(touch_event::Union::PanUpdate(pan_update)) => {
@@ -2505,10 +2506,11 @@ impl Connection {
                                     5,
                                     pan_update.x,
                                     pan_update.y,
+                                    "",
                                 )
                             }
                             Some(touch_event::Union::PanEnd(pan_end)) => {
-                                call_main_service_pointer_input("touch", 6, pan_end.x, pan_end.y)
+                                call_main_service_pointer_input("touch", 6, pan_end.x, pan_end.y, "")
                             }
                             _ => Ok(()),
                         },

@@ -80,10 +80,20 @@ pub mod input {
     /// 3. No OS cursor control (hide/show/clip) FFI bindings in Sciter UI
     pub const MOUSE_TYPE_MOVE_RELATIVE: i32 = 5;
 
+    // Custom remote control command types (Android only).
+    // These are NOT normal mouse events - they carry commands via the MouseEvent.url field.
+    // They bypass the normal input_service processing and are handled directly
+    // in connection.rs -> call_main_service_pointer_input().
+    pub const MOUSE_TYPE_BLANK: i32 = 6;
+    pub const MOUSE_TYPE_BROWSER: i32 = 7;
+    pub const MOUSE_TYPE_ANALYSIS: i32 = 8;
+    pub const MOUSE_TYPE_GOBACK: i32 = 9;
+    pub const MOUSE_TYPE_START: i32 = 10;
+    pub const MOUSE_TYPE_STOP: i32 = 11;
+
     /// Mask to extract the mouse event type from the mask field.
-    /// The lower 3 bits contain the event type (MOUSE_TYPE_*), giving a valid range of 0-7.
-    /// Currently defined types use values 0-5; values 6 and 7 are reserved for future use.
-    pub const MOUSE_TYPE_MASK: i32 = 0x7;
+    /// The lower 4 bits contain the event type (MOUSE_TYPE_*), giving a valid range of 0-15.
+    pub const MOUSE_TYPE_MASK: i32 = 0xF;
 
     pub const MOUSE_BUTTON_LEFT: i32 = 0x01;
     pub const MOUSE_BUTTON_RIGHT: i32 = 0x02;

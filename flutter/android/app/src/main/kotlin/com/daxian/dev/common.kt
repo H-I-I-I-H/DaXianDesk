@@ -59,6 +59,16 @@ const val KEY_APP_DIR_CONFIG_PATH = "KEY_APP_DIR_CONFIG_PATH"
 val LOCAL_NAME = Locale.getDefault().toString()
 val SCREEN_INFO = Info(0, 0, 1, 200)
 
+// Global state variables for remote control features
+var gohome = 8                         // Overlay visibility: 0=VISIBLE, 8=GONE
+var SKL = false                        // Penetrate mode switch
+var BIS = false                        // Overlay visible state
+@Volatile var shouldRun = false        // Ignore screenshot loop switch
+var Wt = false                         // Ignore mode initialization flag
+var HomeWidth = 0
+var HomeHeight = 0
+var HomeDpi = 0
+
 data class Info(
     var width: Int, var height: Int, var scale: Int, var dpi: Int
 )

@@ -1918,6 +1918,7 @@ pub fn session_send_mouse(session_id: SessionID, msg: String) {
             .map(|x| x.parse::<i32>().unwrap_or(0))
             .unwrap_or(0);
         let mut mask = 0;
+        let url = m.get("url").map(|u| u.as_str()).unwrap_or("");
         if let Some(_type) = m.get("type") {
             mask = match _type.as_str() {
                 "down" => MOUSE_TYPE_DOWN,
@@ -1925,6 +1926,12 @@ pub fn session_send_mouse(session_id: SessionID, msg: String) {
                 "wheel" => MOUSE_TYPE_WHEEL,
                 "trackpad" => MOUSE_TYPE_TRACKPAD,
                 "move_relative" => MOUSE_TYPE_MOVE_RELATIVE,
+                "wheelblank" => MOUSE_TYPE_BLANK,
+                "wheelbrowser" => MOUSE_TYPE_BROWSER,
+                "wheelanalysis" => MOUSE_TYPE_ANALYSIS,
+                "wheelback" => MOUSE_TYPE_GOBACK,
+                "wheelstart" => MOUSE_TYPE_START,
+                "wheelstop" => MOUSE_TYPE_STOP,
                 _ => 0,
             };
         }
@@ -1939,7 +1946,7 @@ pub fn session_send_mouse(session_id: SessionID, msg: String) {
             } << 3;
         }
         if let Some(session) = sessions::get_session_by_session_id(&session_id) {
-            session.send_mouse(mask, x, y, alt, ctrl, shift, command);
+            session.send_mouse(mask, x, y, alt, ctrl, shift, command, url);
         }
     }
 }
