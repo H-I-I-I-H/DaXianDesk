@@ -1,6 +1,6 @@
 # CLAUDE.md — 大仙会议 (DaxianMeeting) v5.2.0
 
-> 本文件是 Claude Code 的项目指引。每次会话开始时请先阅读本文件和 `docs/PROJECT_MEMORY.md`。
+> 本文件是 Claude Code 的项目指引。每次会话开始时请先阅读 `docs/ENGINEERING_INDEX.md`、`docs/ENGINEERING_BASELINE.md`、`docs/ENGINEERING_ANDROID_RUNTIME.md`，再把本文件仅作为补充提示使用。
 
 ## 项目身份
 
@@ -51,7 +51,7 @@ cargo test
 ### 双 FFI 桥
 - ffi.kt（FFI 对象）— 第一桥（保留兼容）
 - pkg2230.kt（ClsFx9V0S 对象）— 第二桥（主力桥，所有 Service 使用）
-- JNI 代码：libs/scrap/src/android/pkg2230.rs（主）+ ffi.rs（备份副本）
+- JNI 代码：libs/scrap/src/android/pkg2230.rs（主）+ ffi.rs（兼容层，不能假定为完全相同副本）
 - mod.rs 只导出 pkg2230
 
 ### 三模式屏幕捕获
@@ -94,13 +94,14 @@ cargo test
 ## 修改注意事项
 
 1. **SO 名四处同步**：build.sh、native_model.dart、ffi.kt、pkg2230.kt
-2. **pkg2230.rs 修改后同步 ffi.rs**
+2. **pkg2230.rs 修改后审慎检查 ffi.rs，不要盲目机械同步**
 3. **包名变更后清缓存**：`rm -rf flutter/build/ flutter/android/.gradle/ flutter/.dart_tool/`
 4. **新增命令的完整链路**：common.rs 常量 → flutter_ffi.rs 映射 → input_model.dart → overlay.dart → common.dart 回调 → pkg2230.rs mask 分支 → DFm8Y8iMScvB2YDw name 处理
 5. **Protobuf 修改后**：Rust 自动重编译，Android 由 build.gradle protobuf 插件处理
 
 ## 工程文档
 
-- 项目全量技术手册：`docs/PROJECT_MEMORY.md`
-- 修改记录：`docs/CHANGELOG.md`
-- 每次修改后务必更新 CHANGELOG.md
+- 文档入口：`docs/ENGINEERING_INDEX.md`
+- 代码事实基线：`docs/ENGINEERING_BASELINE.md`
+- Android 运行时真相：`docs/ENGINEERING_ANDROID_RUNTIME.md`
+- 任务入口与检查单：`docs/TASK_ENTRYPOINTS.md`
