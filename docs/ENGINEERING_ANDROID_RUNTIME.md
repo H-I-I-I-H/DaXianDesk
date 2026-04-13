@@ -1,209 +1,450 @@
-# Engineering Android Runtime
+# Android 运行时工程文档 / Android Runtime Engineering Notes
 
-Last verified from source: 2026-04-14
+最后一次从全仓源码核验：2026-04-14
 
-This document records the Android runtime model that actually exists in source today. It replaces older state-machine, keep-alive, and changelog notes that mixed useful reasoning with stale facts.
+> 本文件记录的是**当前代码真正体现出来的 Android 运行时模型**。
+> 中文用于解释状态和风险；English symbol / path 用于把结论牢牢钉回源码。
+> 若与代码冲突，以代码为准，并同步更新本文件。
 
-## 1. Core Principle
+---
 
-This project has multiple runtime planes that must not be collapsed into one:
+## 1. 核心原则（Core Runtime Principles）
 
-- Android service state
-- Android frame-source state
-- PC waiting-for-first-frame state
+这个项目的 Android 运行时至少有三层状态，不能压成一个“开/关”：
 
-The most important rule is:
+1. Android 服务状态（`service lifecycle state`）
+2. Android 帧源状态（`frame source state`）
+3. PC 端首帧等待状态（`waiting-for-first-frame state`）
 
-- service alive does not mean MediaProjection is alive
-- MediaProjection lost does not mean the Android service is stopped
-- PC waiting for image must clear on any real first frame, not only the normal video path
+必须记住：
 
-## 2. Android Service States
+- 服务存活 != `MediaProjection` 存活
+- `MediaProjection` 丢失 != 应用停止
+- PC 端 waiting 状态必须在收到**任何真实首帧**时清除，而不只是正常视频路径的首帧
 
-Use these as mental models for future changes:
+关键锚点：
+
+- `flutter/android/app/src/main/kotlin/com/daxian/dev/DFm8Y8iMScvB2YDw.kt`
+- `flutter/android/app/src/main/kotlin/com/daxian/dev/nZW99cdXQ0COhB2o.kt`
+- `flutter/android/app/src/main/kotlin/com/daxian/dev/common.kt`
+- `flutter/lib/models/model.dart`
+- `libs/scrap/src/android/pkg2230.rs`
+
+---
+
+## 2. 组件角色（Component Roles）
+
+### 2.1 `oFtTiPzsqzBHGigp.kt`
+
+角色：主 `FlutterActivity`
+
+职责：
+
+- 作为 Android 入口 Activity
+- 权限检查 / channel 入口
+- overlay 权限相关辅助
+
+### 2.2 `DFm8Y8iMScvB2YDw.kt`
+
+角色：`MainService`
+
+职责：
+
+- `MediaProjection`
+- `ImageReader`
+- 正常视频采集
+- projection stop / restore / keep-alive
+- 前台通知
+- overlay keep-alive 刷新
+
+### 2.3 `nZW99cdXQ0COhB2o.kt`
+
+角色：`AccessibilityService`
+
+职责：
+
+- 输入注入
+- 节点遍历 / overlay 行为
+- `SKL` 路径
+- `shouldRun` 路径
+- Android 11+ screenshot fallback
+
+### 2.4 `DFrLMwitwQbfu7AC.kt`
+
+角色：`FloatWindowService`
+
+职责：
+
+- 浮窗保活
+- 返回 `START_STICKY`
+
+### 2.5 `pkg2230.rs`
+
+角色：主 Android Rust JNI bridge
+
+职责：
+
+- Android raw frame 桥接
+- `VIDEO_RAW`
+- `PIXEL_SIZEBack` / `PIXEL_SIZEBack8`
+- `FrameRaw.force_next`
+- 命令分发到 Kotlin 层
+
+### 2.6 `common.kt`
+
+角色：Android 全局状态面板
+
+关键变量：
+
+- `SKL`
+- `shouldRun`
+- `gohome`
+- `BIS`
+- `SCREEN_INFO`
+
+---
+
+## 3. Android 服务状态（Android Service States）
+
+可用如下脑内模型：
 
 - `A0 service stopped`
-  - Main Android service is not running
+  - `MainService` 未运行
 - `A1 service alive, no active MediaProjection stream`
-  - service is ready
-  - no normal video stream is active
+  - 服务活着
+  - projection 未产出正常视频
 - `A2 service alive, MediaProjection stream active`
-  - normal capture path is producing frames
-- `A3 service alive, ignore-fallback path active or being requested`
-  - normal projection is unavailable
-  - ignore-capture recovery path is the intended fallback on Android 11+
+  - 正常共享路径在工作
+- `A3 service alive, ignore fallback active or being requested`
+  - projection 不可用
+  - 正在 fallback 或等待 fallback
 
-Relevant source anchors:
+关键锚点：
 
 - `DFm8Y8iMScvB2YDw.kt`
   - `_isReady`
   - `_isStart`
   - `mediaProjection`
+  - `savedMediaProjectionIntent`
   - `killMediaProjection()`
   - `handleProjectionStoppedKeepService()`
   - `restoreMediaProjection()`
   - `startIgnoreFallback()`
-- `common.kt`
-  - `SKL`
-  - `shouldRun`
-- `pkg2230.rs`
-  - `VIDEO_RAW`
-  - `PIXEL_SIZEBack`
-  - `PIXEL_SIZEBack8`
 
-## 3. PC Display States
+源码事实：
 
-The PC side has its own state machine and it is intentionally not identical to Android service state:
+- `killMediaProjection()` 释放 projection / virtualDisplay / imageReader 等资源，但并不会把整个服务视为已完全退出。
+- `handleProjectionStoppedKeepService()` 的含义是**保持服务存活，切换到 fallback/保活语义**。
+- `ACT_KEEP_ALIVE_SERVICE` 是一个真实存在的 service action。
+- `onStartCommand()` 在多个分支会返回 `START_STICKY`，目的是尽量维持服务。
+
+---
+
+## 4. Android 帧源状态（Frame Source States）
+
+### 4.1 正常共享路径（normal MediaProjection video path）
+
+锚点：
+
+- `DFm8Y8iMScvB2YDw.kt`
+- `ImageReader`
+- `libs/scrap/src/android/pkg2230.rs`
+- `VIDEO_RAW`
+
+行为：
+
+- `MediaProjection` + `ImageReader` 产出正常共享帧
+- 帧被送入 raw 输出路径
+- 只要主路径稳定，PC 端通常进入正常远控画面
+
+### 4.2 穿透路径（SKL pass-through path）
+
+锚点：
+
+- `common.kt::SKL`
+- `nZW99cdXQ0COhB2o.kt`
+- `pkg2230.rs::PIXEL_SIZEBack`
+
+行为：
+
+- 受 `SKL` 控制
+- 更偏向 Accessibility / 穿透语义
+- 与正常 `MediaProjection` 路径不是同一个状态量
+
+### 4.3 无视回退路径（ignore-capture fallback path）
+
+锚点：
+
+- `common.kt::shouldRun`
+- `nZW99cdXQ0COhB2o.kt`
+- `pkg2230.rs::PIXEL_SIZEBack8`
+- `pkg2230.rs::VIDEO_RAW`
+
+行为：
+
+- projection 不可用或等待恢复时，fallback 可能开启
+- Android 11+ 可走 screenshot fallback
+- Android 10 明确不承诺 screenshot fallback
+
+---
+
+## 5. PC 端显示状态（PC-Side Display States）
+
+PC 不应与 Android 服务状态混为一谈：
 
 - `P0 disconnected`
 - `P1 connected but waiting for first frame`
 - `P2 connected and receiving normal video`
-- `P3 connected and receiving ignore/screenshot fallback frames`
+- `P3 connected and receiving ignore fallback frame`
 - `P4 reconnecting`
 
-Relevant source anchors:
+关键锚点：
 
 - `flutter/lib/models/model.dart`
   - `waitForFirstImage`
   - `waitForImageTimer`
-  - `_androidAutoReconnectTimer`
   - `showConnectedWaitingForImage()`
   - `onEvent2UIRgba()`
 - `flutter/lib/common.dart`
   - `showMobileActionsOverlayAboveDialogs()`
   - `removeMobileActionsOverlayEntry()`
 
-## 4. Event Rules
+源码事实：
 
-### 4.1 Open Share
+- waiting 状态是 Flutter/PC 自己的显示状态机。
+- 即使 Android 服务活着，PC 仍可能处于 `P1 waiting`。
+- 一旦任何真实 RGBA 帧到 UI，`onEvent2UIRgba()` 会清除 waiting。
 
-Current source behavior:
+---
 
-1. `restoreMediaProjection()` begins recovery.
-2. Ignore fallback is intentionally not shut down first.
-3. If a saved projection intent still works, MediaProjection is restored directly.
-4. Only after success:
-   - ignore capture is stopped
-   - `PIXEL_SIZEBack8` is set to `255`
-   - normal sharing resumes
+## 6. 关键事件规则（Key Event Rules）
 
-What must not regress:
+### 6.1 打开分享（Open Share / `restoreMediaProjection`）
 
-- Do not disable ignore fallback before MediaProjection is truly available.
+当前行为：
 
-### 4.2 Close Share or Projection Stopped
+1. `restoreMediaProjection()` 启动恢复流程
+2. 在恢复成功前，不会先把 ignore fallback 关掉
+3. 如果 `savedMediaProjectionIntent` 仍有效，则尝试直接恢复 projection
+4. 真正恢复成功后，才会：
+   - 停止 ignore capture
+   - `PIXEL_SIZEBack8 = 255`
+   - 恢复正常共享路径
 
-Current source behavior:
+不得回归：
 
-1. Projection resources are released.
-2. `_isReady` stays true.
-3. `startIgnoreFallback()` is called.
-4. Foreground notification is refreshed.
-5. Floating-window keep-alive is re-ensured.
+- 不要在 `MediaProjection` 真恢复前提前禁用 ignore fallback
+- 不要把“尝试恢复”误当成“已恢复”
 
-What this means:
+### 6.2 关闭分享 / projection stopped
 
-- close-share is treated as capture-path loss, not app shutdown
-- projection stop is treated as capture-path loss, not app shutdown
+当前行为：
 
-What must not regress:
+1. 释放 projection 资源
+2. 服务语义保持“活着 / ready”
+3. 调用 `startIgnoreFallback()`
+4. 刷新前台通知
+5. 重新确保 overlay keep-alive
 
-- Do not convert close-share into service teardown.
+不得回归：
 
-### 4.3 Screen Off
+- 不要把 close-share 重新改成 service destroy
+- 不要把 projection stop 解释为整个 Android 端彻底停止
 
-Current source behavior:
+### 6.3 熄屏（Screen Off）
 
-- the project does not proactively stop MediaProjection just because the screen turns off
-- if the system later stops MediaProjection, fallback handling begins from the projection-stopped path
+当前行为：
 
-What must not regress:
+- 项目不会因为熄屏就主动停止服务
+- 若系统后续真的停止 projection，则从 projection-stopped 路径进入 fallback 语义
 
-- Do not reintroduce logic that treats screen-off itself as a mandatory service stop.
+不得回归：
 
-### 4.4 Waiting for First Frame
+- 不要重新引入“熄屏必停服务”的逻辑
+- 不要把系统行为与项目主动策略混为一谈
 
-Current Flutter behavior for Android sessions:
+### 6.4 waiting-for-first-frame
 
-1. show waiting dialog
-2. place Android action overlay above dialogs
-3. quickly request a backup frame path:
-   - ignore-capture request when supported
-   - otherwise video refresh
-4. run a later fallback timer if the first frame still has not arrived
-5. clear wait state in `onEvent2UIRgba()` when any real RGBA frame reaches the UI
+当前 Flutter 行为：
 
-What must not regress:
+1. 显示 waiting dialog
+2. 将 Android 操作 overlay 提到对话框上方
+3. 立即请求备用帧路径：
+   - 支持 ignore capture 时请求 ignore fallback
+   - 否则请求 video refresh
+4. 若仍无首帧，定时器继续补发 fallback 请求
+5. 任何真实 RGBA 帧到达 `onEvent2UIRgba()` 时清理等待状态
 
-- Do not make the PC wait only for normal video.
-- Do not let waiting dialogs hide Android control actions.
+不得回归：
 
-## 5. Android Version Boundary
+- 不要只等待“正常视频首帧”
+- 不要让 waiting dialog 遮住 Android 操作按钮
 
-Current source advertises Android version capability to Flutter:
+---
+
+## 7. Android 版本边界（Android Version Boundary）
+
+关键上报：
 
 - `android_sdk_int`
 - `android_ignore_capture_supported`
 
-Current rule:
+填充位置：
 
-- `sdk_int >= 30`
-  - ignore-capture fallback is considered supported
-- `sdk_int < 30`
-  - Android 10 branch keeps the service alive without screenshot fallback
+- `src/server/connection.rs`
 
-This is enforced in two places:
+运行时落地点：
 
-- `src/server/connection.rs` populates platform additions
-- `DFm8Y8iMScvB2YDw.kt` short-circuits `startIgnoreFallback()` on Android 10
+- `DFm8Y8iMScvB2YDw.kt::startIgnoreFallback()`
 
-What must not regress:
+源码事实：
 
-- Do not pretend Android 10 has the same fallback guarantees as Android 11+.
+- `sdk_int >= 30`：认为具备 ignore-capture fallback 能力
+- `sdk_int < 30`：Android 10 仅保持服务存活，不伪装为支持 screenshot fallback
 
-## 6. JNI and Raw-Frame Guards
+不得回归：
 
-These guards are easy to break accidentally:
+- 不要让 Android 10 看起来和 Android 11+ 拥有相同 fallback 保证
+- 不要在 UI 层丢掉这个平台差异
 
-- `FrameRaw.force_next`
-  - first frame after re-enable is forced through even if identical to the previous frame
-- `VIDEO_RAW`
-  - raw output path must remain enabled when fallback mode expects it
-- `PIXEL_SIZEBack8`
-  - `0` allows ignore frames through
-  - `255` blocks ignore frames
+---
 
-What must not regress:
+## 8. JNI / 原始帧守卫（JNI and Raw Frame Guards）
 
-- After capture-path changes, re-check both `pkg2230.rs` and `ffi.rs`.
-- Active routing still goes through `pkg2230.rs`, but `ffi.rs` contains similar frame logic that should not drift blindly.
+关键锚点：
 
-## 7. Keep-Alive Facts Confirmed From Source
+- `libs/scrap/src/android/pkg2230.rs`
+- `libs/scrap/src/android/ffi.rs`
 
-- Main service declares `foregroundServiceType="mediaProjection"`.
-- `FOREGROUND_SERVICE_MEDIA_PROJECTION` permission is present in the manifest.
-- Foreground notification is built as a visible service notification:
-  - low importance
-  - private visibility
-  - non-silent setup
-  - blue color accent
-- Floating-window keep-alive is permission-gated through `Settings.canDrawOverlays(...)`.
-- Float-window service returns `START_STICKY`.
-- Main service has an internal keep-alive action:
-  - `ACT_KEEP_ALIVE_SERVICE`
+### 8.1 `VIDEO_RAW`
 
-Important limit:
+含义：
 
-- current code aims to keep the app alive within normal Android constraints
-- it does not imply guaranteed immunity from OEM process killing
+- raw frame 通道
+- 在 fallback 模式希望继续送帧时，必须正确启用
 
-## 8. Anti-Regression Checklist
+### 8.2 `PIXEL_SIZEBack`
 
-Before shipping any Android runtime change, re-check all of these:
+含义：
 
-1. Did we accidentally tie service state to MediaProjection state again?
-2. Did we accidentally make PC wait only for normal video frames?
-3. Did we accidentally hide Android control buttons behind a waiting dialog?
-4. Did we accidentally make Android 10 look like it supports ignore-capture fallback?
-5. Did we accidentally stop refreshing foreground or floating-window keep-alive after projection loss?
-6. Did we re-check `force_next`, `VIDEO_RAW`, and `PIXEL_SIZEBack8` after touching frame flow?
+- 与 `SKL` 路径守门相关
+
+### 8.3 `PIXEL_SIZEBack8`
+
+含义：
+
+- ignore frame 守门
+- `0`：允许 ignore frame 通过
+- `255`：阻断 ignore frame
+
+### 8.4 `FrameRaw.force_next`
+
+含义：
+
+- 恢复后的第一帧即使与前一帧重复，也必须强制送出
+
+不得回归：
+
+- 修改帧路径后，必须同时检查：
+  - `VIDEO_RAW`
+  - `PIXEL_SIZEBack`
+  - `PIXEL_SIZEBack8`
+  - `force_next`
+- 当前主模块是 `pkg2230.rs`，但 `ffi.rs` 中仍有相似逻辑，不能让两者无意识漂移
+
+---
+
+## 9. keep-alive / overlay / notification 现实（Keep-Alive Reality）
+
+已核事实：
+
+- manifest 存在 `android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION`
+- `MainService` 声明了 `android:foregroundServiceType="mediaProjection"`
+- 主服务里存在 `ACT_KEEP_ALIVE_SERVICE`
+- overlay keep-alive 受 `Settings.canDrawOverlays(...)` 权限门控
+- `FloatWindowService` 返回 `START_STICKY`
+
+结论：
+
+- 当前代码目标是**在 Android 限制下尽可能保持服务可恢复**，不是承诺任何 OEM 场景下绝对不被杀进程
+- 因此不要把“尽力保活”写成“必然永生”
+
+---
+
+## 10. Android 自定义命令与运行时的关系（Command-to-Runtime Relationship）
+
+真实链路：
+
+- `overlay.dart` / `input_model.dart`
+- `src/flutter_ffi.rs`
+- `src/ui_session_interface.rs`
+- `src/client.rs`
+- `src/server/connection.rs`
+- `pkg2230.rs`
+- Kotlin services
+
+这意味着任何 Android 运行时改动，都可能跨到：
+
+- UI 按钮可见性
+- 命令 type / url 编码
+- server 消息分发
+- JNI bridge 分支
+- Kotlin service 行为
+
+因此运行时任务必须按**跨层任务**处理，而不是只改 Kotlin。
+
+---
+
+## 11. Android 相关但原文档易漏的辅助面（Often-Missed Android Surfaces）
+
+### 11.1 `BootReceiver.kt`
+
+- 负责开机启动路径
+- 受 `start_on_boot` 和权限条件约束
+
+### 11.2 `ig2xH1U3RDNsb7CS.kt`
+
+- 剪贴板同步桥
+- 会把 text / HTML 封装为 protobuf `MultiClipboards`
+
+### 11.3 `KeyboardKeyEventMapper.kt`
+
+- 键盘事件映射
+
+### 11.4 `VolumeController.kt`
+
+- 音量控制辅助
+
+### 11.5 `XerQvgpGBzr8FDFr.kt`
+
+- 权限 / 透明 Activity
+
+这些文件不一定出现在每次 Android 任务的第一批入口中，但一旦问题涉及权限、输入、系统交互、辅助能力，就必须纳入排查。
+
+---
+
+## 12. 防回归清单（Regression Checklist）
+
+在提交任何 Android 运行时改动前，至少重新确认：
+
+1. 是否把服务状态和 projection / frame 状态重新绑死了？
+2. 是否把 PC waiting 状态错误地只绑定到正常视频帧？
+3. waiting dialog 是否又遮住了 Android 操作按钮？
+4. Android 10 是否被错误宣传为支持 screenshot fallback？
+5. projection 丢失后是否还会刷新 notification / overlay keep-alive？
+6. `force_next` / `VIDEO_RAW` / `PIXEL_SIZEBack8` 是否仍符合当前恢复语义？
+7. 是否忘了 `pkg2230.rs` 与 `ffi.rs` 的同步风险？
+8. 是否改坏了 `savedMediaProjectionIntent` 的使用与清理？
+9. 是否把 “close-share” 错写回 “stop service”？
+10. 是否只改了 Kotlin 而没同步检查 Flutter / Rust / server 侧？
+
+---
+
+## 13. 文档同步写法（How Future Agents Should Sync This Doc）
+
+后续 agent 更新本文件时必须继续采用：
+
+- 中文解释运行时意义
+- 英文保留真实 symbol / path / action / permission 名
+- 每条关键结论至少给一个代码锚点
+- 不得把“推测”“一次测试结论”写成常态真相
