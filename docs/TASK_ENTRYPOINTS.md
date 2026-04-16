@@ -1,10 +1,32 @@
 # 任务入口点 / Task Entrypoints
 
-最后一次从全仓源码核验：2026-04-14
+最后一次从全仓源码核验：2026-04-16
 
 > 本文件按“改动类型”给出第一批应该打开的文件。
 > 目标是让 Codex / Claude Code 从**最短、最对的调用链入口**开始。
 > 所有路径保留英文原文，中文只负责解释任务边界。
+
+---
+
+## 0. 当前任务纪律与最新热修入口（Current Task Guard）
+
+后续任务必须遵守：
+
+- 不替用户执行 `git commit`。
+- 不执行编译/构建命令，除非用户之后明确改变要求。
+- 重要修改后同步当前 `docs/` 工程文档。
+- 若文档与源码冲突，先相信源码，再修正文档。
+
+黑屏 overlay / 远程输入卡顿相关任务，第一入口固定为：
+
+- `flutter/android/app/src/main/kotlin/com/daxian/dev/nZW99cdXQ0COhB2o.kt`
+- `docs/ENGINEERING_ANDROID_RUNTIME.md`
+
+防止误改范围：
+
+- 不要优先改 `pkg2230.rs` 的 `PIXEL_SIZE*` 逻辑；它属于黑屏视觉/像素路径，不是本次动态 touch flag 卡顿根因。
+- 不要改 Rust FFI、命令协议、侧按钮 mask、`overlay.dart` 或 `input_model.dart`，除非新问题的调用链明确指向这些文件。
+- 检查是否误恢复 `isBlackScreenActive` / `restoreBlockRunnable` / `setOverlayTouchBlock` / `FLAG_NOT_TOUCHABLE` 动态切换。
 
 ---
 

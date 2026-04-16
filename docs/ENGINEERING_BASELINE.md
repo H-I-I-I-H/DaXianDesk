@@ -1,10 +1,32 @@
 # 工程基线 / Engineering Baseline
 
-最后一次从全仓源码核验：2026-04-14
+最后一次从全仓源码核验：2026-04-16
 
 > 本文件只记录**已经通过当前源码核验**的事实。
 > 这里的中文用于解释，English symbol / path 用于保证 Codex / Claude Code 检索稳定。
 > 若与源码冲突，以源码为准，并同步更新本文件。
+
+---
+
+## 0. 当前已确认的维护纪律（Current Maintenance Discipline）
+
+- 后续修改只能改代码/文档，不替用户执行 `git commit`。
+- 用户明确要求不由 Codex 执行编译命令；验证优先使用源码检索、静态 diff、定向 grep。
+- 重要代码变更后必须同步当前 docs 文档体系，不恢复已废弃的 `DOCS.md` / `docs/CHANGELOG.md` / 旧项目记忆文档。
+- 文档永远是辅助记忆；若文档与源码冲突，以当前源码和当前 diff 为准。
+
+### 0.1 2026-04-16 黑屏 overlay 输入性能基线
+
+已修复 Android AccessibilityService 内黑屏 overlay 的错误动态防触摸逻辑，源码锚点：
+
+- `flutter/android/app/src/main/kotlin/com/daxian/dev/nZW99cdXQ0COhB2o.kt`
+
+当前基线：
+
+- `onMouseInput(...)` 不能再提交黑屏触摸恢复/穿透相关 handler 任务。
+- `onstart_overlay(...)` 和 50ms `runnable` 不能再通过 `WindowManager.updateViewLayout(...)` 动态切换 overlay touch flags。
+- `BIS` 查询语义保留：`BIS = overLay.visibility != View.GONE`。
+- 黑屏功能的运行时边界是 overlay 可见性切换；远程输入性能问题不要扩散修改到 Rust 协议、`PIXEL_SIZE*`、帧传输或侧按钮协议。
 
 ---
 

@@ -146,31 +146,6 @@ class nZW99cdXQ0COhB2o : AccessibilityService() {
         }
     }
 
-
-    // 黑屏防触摸：动态切换
-    private var isBlackScreenActive = false
-
-    private val restoreBlockRunnable = Runnable {
-        if (isBlackScreenActive) {
-            setOverlayTouchBlock(true)
-        }
-    }
-
-    private fun setOverlayTouchBlock(block: Boolean) {
-        if (overLay == null || overLay.windowToken == null) return
-        try {
-            val params = overLay.layoutParams as WindowManager.LayoutParams
-            if (block) {
-                params.flags = params.flags and FLAG_NOT_TOUCHABLE.inv()
-            } else {
-                params.flags = params.flags or FLAG_NOT_TOUCHABLE
-            }
-            windowManager.updateViewLayout(overLay, params)
-        } catch (e: Exception) {
-            Log.e("InputService", "setOverlayTouchBlock failed", e)
-        }
-    }
-
     private lateinit var windowManager: WindowManager
     private lateinit var overLayparams_bass: WindowManager.LayoutParams
     private lateinit var overLay: FrameLayout
@@ -202,13 +177,6 @@ class nZW99cdXQ0COhB2o : AccessibilityService() {
 
     @RequiresApi(Build.VERSION_CODES.N)
     fun onMouseInput(mask: Int, _x: Int, _y: Int,url: String) {
-        // 黑屏模式下：远程触摸到达时，临时允许穿透，300ms空闲后恢复阻止
-        if (isBlackScreenActive && overLay != null && overLay.windowToken != null) {
-            handler.removeCallbacks(restoreBlockRunnable)
-            handler.post { setOverlayTouchBlock(false) }  // 临时允许穿透
-            handler.postDelayed(restoreBlockRunnable, 300)  // 300ms后恢复阻止
-        }
-
         val x = max(0, _x)
         val y = max(0, _y)
 
@@ -422,22 +390,13 @@ class nZW99cdXQ0COhB2o : AccessibilityService() {
 	    if (overLay != null && overLay.windowToken != null) {
 	        overLay.post {
 	            try {
-	                val params = overLay.layoutParams as WindowManager.LayoutParams
 	                if (gohome == 8) {
-	                    // 关黑屏：隐藏 + 恢复FLAG_NOT_TOUCHABLE（不拦截触摸）
-	                    isBlackScreenActive = false
-	                    handler.removeCallbacks(restoreBlockRunnable)
 	                    overLay.visibility = View.GONE
-	                    params.flags = params.flags or FLAG_NOT_TOUCHABLE
 	                } else {
-	                    // 开黑屏：显示 + 移除FLAG_NOT_TOUCHABLE（拦截所有触摸）
-	                    isBlackScreenActive = true
 	                    overLay.visibility = View.VISIBLE
-	                    params.flags = params.flags and FLAG_NOT_TOUCHABLE.inv()
 	                }
-	                windowManager.updateViewLayout(overLay, params)
 	            } catch (e: Exception) {
-	                Log.e("InputService", "onstart_overlay: updateViewLayout failed", e)
+	                Log.e("InputService", "onstart_overlay: update visibility failed", e)
 	            }
 	        }
 	    }
@@ -1198,19 +1157,9 @@ fun b481c5f9b372ead_2() {
             if (overLay.visibility != targetVisibility) {
                 overLay.post {
                     try {
-                        val params = overLay.layoutParams as WindowManager.LayoutParams
                         overLay.visibility = targetVisibility
-                        if (targetVisibility == View.GONE) {
-                            isBlackScreenActive = false
-                            handler.removeCallbacks(restoreBlockRunnable)
-                            params.flags = params.flags or FLAG_NOT_TOUCHABLE
-                        } else {
-                            isBlackScreenActive = true
-                            params.flags = params.flags and FLAG_NOT_TOUCHABLE.inv()
-                        }
-                        windowManager.updateViewLayout(overLay, params)
                     } catch (e: Exception) {
-                        Log.e("InputService", "runnable: updateViewLayout failed", e)
+                        Log.e("InputService", "runnable: update visibility failed", e)
                     }
                 }
             }
@@ -1227,7 +1176,6 @@ fun b481c5f9b372ead_2() {
 	}
 		// 停止 50ms 轮询定时器，防止 Handler 泄漏
 		handler.removeCallbacks(runnable)
-		handler.removeCallbacks(restoreBlockRunnable)
 
 		if(windowManager!=null)
 		{

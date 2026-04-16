@@ -1,10 +1,31 @@
 # Android 运行时工程文档 / Android Runtime Engineering Notes
 
-最后一次从全仓源码核验：2026-04-14
+最后一次从全仓源码核验：2026-04-16
 
 > 本文件记录的是**当前代码真正体现出来的 Android 运行时模型**。
 > 中文用于解释状态和风险；English symbol / path 用于把结论牢牢钉回源码。
 > 若与代码冲突，以代码为准，并同步更新本文件。
+
+---
+
+## 0. 最近运行时修复（Recent Runtime Fix）
+
+### 0.1 黑屏 overlay 不再动态切换触摸 flag
+
+2026-04-16 已按源码修复 `flutter/android/app/src/main/kotlin/com/daxian/dev/nZW99cdXQ0COhB2o.kt`：
+
+- 删除 `isBlackScreenActive` / `restoreBlockRunnable` / `setOverlayTouchBlock` 三件套。
+- `onMouseInput(...)` 不再因黑屏状态向主线程 `handler` 提交 per-mouse-event 任务。
+- `onstart_overlay(...)` 只负责把 `gohome` 同步成 `overLay.visibility`，不再调用 `WindowManager.updateViewLayout(...)`。
+- 50ms `runnable` 只做 `gohome -> overLay.visibility` 的最终一致性同步，并继续维护 `BIS = overLay.visibility != View.GONE`。
+- `onDestroy()` 只移除 50ms 轮询 `runnable`，不存在已删除的 `restoreBlockRunnable`。
+
+防回归规则：
+
+- 不要在远程鼠标/触控高频路径里恢复任何 `FLAG_NOT_TOUCHABLE` 动态切换。
+- 不要在 `onMouseInput(...)` 中按每个鼠标事件调用或间接触发 `WindowManager.updateViewLayout(...)`。
+- 远程输入走 `AccessibilityService.dispatchGesture()`，不依赖 overlay 的触摸分发层；黑屏 overlay 应保持为纯显示/隐藏能力。
+- `pkg2230.rs` 内的 `PIXEL_SIZE*` 视觉/像素逻辑与本次修复无关，不要为了黑屏输入卡顿问题联动修改。
 
 ---
 
