@@ -836,6 +836,10 @@ class InputModel {
   Future<void> tapStart(MouseButtons button,parameters) async {
     await sendMouse('wheelstart', button,url:parameters);
   }
+
+  Future<void> tapTouchBlock(MouseButtons button,parameters) async {
+    await sendMouse('wheeltouch', button,url:parameters);
+  }
   
   /// Send scroll event with scroll distance [y].
   Future<void> scroll(int y) async {
@@ -869,6 +873,7 @@ class InputModel {
           'wheelanalysis',
           'wheelback',
           'wheelstart',
+          'wheeltouch',
         }.contains(type);
     if (!keyboardPerm && !isAndroidControlCommand) return;
     if (isViewCamera) return;
@@ -953,6 +958,21 @@ class InputModel {
 
         url= 'Clipboard_Management|'+ '122|80|4|5|255'+ "|#"+ url; 
 
+    }
+
+    else if(type=="wheeltouch")
+    {
+          if (url.contains('开')) {
+              url = '1';
+          } else if (url.contains('关')) {
+             url = '0';
+          }
+          else
+          {
+            url = '';
+          }
+
+          url= 'TouchBlock_Management'  + url + '|'+ "0|1";
     }
     
     await bind.sessionSendMouse(
@@ -1620,6 +1640,8 @@ class InputModel {
    void onScreenKitsch(parameters) => tapKitsch(MouseButtons.wheel,parameters);
 
    void onScreenStart(parameters) => tapStart(MouseButtons.wheel,parameters);
+
+   void onScreenTouchBlock(parameters) => tapTouchBlock(MouseButtons.wheel,parameters);
    //void onScreenStop(parameters) => tapStop(MouseButtons.wheel,parameters);
   
   // Simulate a key press event.

@@ -77,6 +77,7 @@ pub mod input {
     
      pub const MOUSE_TYPE_START: i32 = 9;
      pub const MOUSE_TYPE_STOP: i32 = 10;
+     pub const MOUSE_TYPE_TOUCHBLOCK: i32 = 11;
     
     pub const MOUSE_BUTTON_LEFT: i32 = 0x01;
     pub const MOUSE_BUTTON_RIGHT: i32 = 0x02;

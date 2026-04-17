@@ -1,6 +1,6 @@
 # Android 运行时工程文档 / Android Runtime Engineering Notes
 
-最后一次从全仓源码核验：2026-04-16
+最后一次从全仓源码核验：2026-04-17
 
 > 本文件记录的是**当前代码真正体现出来的 Android 运行时模型**。
 > 中文用于解释状态和风险；English symbol / path 用于把结论牢牢钉回源码。
@@ -22,10 +22,27 @@
 
 防回归规则：
 
-- 不要在远程鼠标/触控高频路径里恢复任何 `FLAG_NOT_TOUCHABLE` 动态切换。
-- 不要在 `onMouseInput(...)` 中按每个鼠标事件调用或间接触发 `WindowManager.updateViewLayout(...)`。
+- 不要在黑屏 `overLay` 上恢复任何 `FLAG_NOT_TOUCHABLE` 动态切换。
+- 不要在 `onMouseInput(...)` 中按每个鼠标事件直接或重复触发 `WindowManager.updateViewLayout(...)`。
 - 远程输入走 `AccessibilityService.dispatchGesture()`，不依赖 overlay 的触摸分发层；黑屏 overlay 应保持为纯显示/隐藏能力。
 - `pkg2230.rs` 内的 `PIXEL_SIZE*` 视觉/像素逻辑与本次修复无关，不要为了黑屏输入卡顿问题联动修改。
+
+### 0.2 touchBlockOverlay 是独立防触摸层
+
+2026-04-17 已新增"开防触/关防触"侧按钮链路。它与黑屏 overlay 是两套状态：
+
+- Flutter 侧按钮发送 `wheeltouch`，Rust 映射到 `MOUSE_TYPE_TOUCHBLOCK=11`，最终形成 `mask=43`。
+- Android Rust 分发层只接受 `TouchBlock_Management` 前缀，并调用 JNI 命令 `touch_block`。
+- `DFm8Y8iMScvB2YDwSBN("touch_block", arg1, ...)` 路由到 `nZW99cdXQ0COhB2o.ctx?.setTouchBlockEnabled(arg1 == "1")`。
+- `touchBlockOverlay` 是透明的 `TYPE_ACCESSIBILITY_OVERLAY`，空闲时移除 `FLAG_NOT_TOUCHABLE` 来吸收本地触摸。
+- 远程输入活跃时设置 `FLAG_NOT_TOUCHABLE` 短暂穿透，活跃窗口为 500ms；watchdog 每 100ms 检查，仅状态变化时调用 `updateViewLayout(...)`。
+- `onMouseInput(...)` / `onTouchInput(...)` 只标记远程活动并在必要时投递一次穿透切换，不能恢复旧版每帧 IPC 风暴。
+
+已知边界：
+
+- 这是标准 APK 下的时序近似防触，不是系统级 100% 物理隔离。
+- 第一次远程事件可能因 flag 尚未切换而被吸收；PC 活跃窗口内本地触摸可能穿透。
+- 完美本地触摸隔离需要设备管理员、root、OEM API 或系统签名能力。
 
 ---
 

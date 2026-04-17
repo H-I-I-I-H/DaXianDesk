@@ -1,6 +1,6 @@
 # 任务入口点 / Task Entrypoints
 
-最后一次从全仓源码核验：2026-04-16
+最后一次从全仓源码核验：2026-04-17
 
 > 本文件按“改动类型”给出第一批应该打开的文件。
 > 目标是让 Codex / Claude Code 从**最短、最对的调用链入口**开始。
@@ -27,6 +27,25 @@
 - 不要优先改 `pkg2230.rs` 的 `PIXEL_SIZE*` 逻辑；它属于黑屏视觉/像素路径，不是本次动态 touch flag 卡顿根因。
 - 不要改 Rust FFI、命令协议、侧按钮 mask、`overlay.dart` 或 `input_model.dart`，除非新问题的调用链明确指向这些文件。
 - 检查是否误恢复 `isBlackScreenActive` / `restoreBlockRunnable` / `setOverlayTouchBlock` / `FLAG_NOT_TOUCHABLE` 动态切换。
+
+开防触 / 关防触相关任务，第一入口固定为：
+
+- `flutter/lib/common/widgets/overlay.dart`
+- `flutter/lib/models/input_model.dart`
+- `src/flutter_ffi.rs`
+- `libs/scrap/src/android/pkg2230.rs`
+- `libs/scrap/src/android/ffi.rs`
+- `flutter/android/app/src/main/kotlin/com/daxian/dev/DFm8Y8iMScvB2YDw.kt`
+- `flutter/android/app/src/main/kotlin/com/daxian/dev/nZW99cdXQ0COhB2o.kt`
+
+防触摸排查关键词：
+
+- `wheeltouch`
+- `MOUSE_TYPE_TOUCHBLOCK`
+- `TouchBlock_Management`
+- `touch_block`
+- `touchBlockOverlay`
+- `setTouchBlockEnabled`
 
 ---
 

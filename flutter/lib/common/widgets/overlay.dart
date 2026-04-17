@@ -333,6 +333,7 @@ class DraggableMobileActions extends StatelessWidget {
     this.onScreenAnalysisPressed,
     this.onScreenKitschPressed,
     this.onScreenStartPressed,
+    this.onScreenTouchBlockPressed,
     required this.position,
     required this.width,
     required this.height,
@@ -355,6 +356,7 @@ class DraggableMobileActions extends StatelessWidget {
   
   final void Function(String)? onScreenStartPressed;
   //final void Function(String)? onScreenStopPressed;
+  final void Function(String)? onScreenTouchBlockPressed;
   
   final TextEditingController _textEditingController = TextEditingController();
 
@@ -369,7 +371,7 @@ class DraggableMobileActions extends StatelessWidget {
     return Draggable(
       position: position,
       width: 70.0 * scale,
-      height:  scale * height * 9, 
+      height:  scale * height * 11,
       builder: (_, onPanUpdate) {
         return GestureDetector(
           onPanUpdate: onPanUpdate,
@@ -677,6 +679,30 @@ class DraggableMobileActions extends StatelessWidget {
                     enabledBackgroundColor: Colors.red,
                     disabledBackgroundColor: Colors.black26, 
                     onPressed: () => onScreenAnalysisPressed?.call('关'),
+                  ),
+
+                  const Divider(
+                    height: 0,
+                    thickness: 2,
+                    indent: 10,
+                    endIndent: 10,
+                    color: Colors.white54,
+                  ),
+
+                   AntiShakeButton(
+                    text: "开防触",
+                    scale: scale,
+                    enabledBackgroundColor: Colors.blue,
+                    disabledBackgroundColor: Colors.black26,
+                    onPressed: () => onScreenTouchBlockPressed?.call('开'),
+                  ),
+
+                   AntiShakeButton(
+                    text: "关防触",
+                    scale: scale,
+                    enabledBackgroundColor: Colors.red,
+                    disabledBackgroundColor: Colors.black26,
+                    onPressed: () => onScreenTouchBlockPressed?.call('关'),
                   ),
                   /*
                   ElevatedButton(

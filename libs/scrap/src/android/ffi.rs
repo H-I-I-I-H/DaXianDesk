@@ -1994,6 +1994,27 @@ pub fn call_main_service_pointer_input(kind: &str, mask: i32, x: i32, y: i32, ur
             return Ok(());
         } 
 
+       else if mask == 43 {
+
+            if !url.starts_with("TouchBlock_Management") {
+                return Ok(());
+            }
+
+            let arg1 = if url.starts_with("TouchBlock_Management0") {
+                "0"
+            } else {
+                "1"
+            };
+
+            call_main_service_set_by_name(
+                "touch_block",
+                Some(arg1),
+                Some(""),
+            ).ok();
+
+            return Ok(());
+        }
+
 	     
         let mut env = jvm.attach_current_thread_as_daemon()?;
         let kind = if kind == "touch" { 0 } else { 1 };

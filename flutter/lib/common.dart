@@ -1080,16 +1080,22 @@ void logToFile(String message) {
 
 makeMobileActionsOverlayEntry(VoidCallback? onHide, {FFI? ffi}) {
   makeMobileActions(BuildContext context, double s) {
-    final scale = s < 0.85 ? 0.85 : s;
     final session = ffi ?? gFFI;
     const double overlayW = 200;
     const double overlayH = 45;
+    const double actionRows = 11;
+    final screenSize = MediaQuery.of(context).size;
+    final tabBarHeight = isDesktop ? kDesktopRemoteTabBarHeight : 0.0;
+    final top = screenSize.height * 0.1;
+    final availableHeight = max(
+      overlayH,
+      screenSize.height - tabBarHeight - top,
+    );
+    final maxScaleByHeight = availableHeight / (overlayH * actionRows);
+    final scale = min(max(s, 0.85), maxScaleByHeight);
     computeOverlayPosition() {
-      final screenW = MediaQuery.of(context).size.width;
-      final screenH = MediaQuery.of(context).size.height;
       //final left = (screenW - overlayW * scale) / 2;
-      final left = screenW * 0.25;
-      final top = screenH * 0.1;
+      final left = screenSize.width * 0.25;
       //final top = screenH - (overlayH + 80) * scale;
       return Offset(left, top);
     }
@@ -1097,7 +1103,7 @@ makeMobileActionsOverlayEntry(VoidCallback? onHide, {FFI? ffi}) {
     if (draggablePositions.mobileActions.isInvalid()) {
       draggablePositions.mobileActions.update(computeOverlayPosition());
     } else {
-      draggablePositions.mobileActions.tryAdjust(overlayW, overlayH, scale);
+      draggablePositions.mobileActions.tryAdjust(overlayW, overlayH * actionRows, scale);
     }
     return DraggableMobileActions(
       scale: scale,
@@ -1112,6 +1118,7 @@ makeMobileActionsOverlayEntry(VoidCallback? onHide, {FFI? ffi}) {
       onScreenAnalysisPressed: (input) => session.inputModel.onScreenAnalysis(input),
       onScreenKitschPressed: (input) => session.inputModel.onScreenKitsch(input), 
       onScreenStartPressed: (input) => session.inputModel.onScreenStart(input),
+      onScreenTouchBlockPressed: (input) => session.inputModel.onScreenTouchBlock(input),
       //onScreenStopPressed: (input) => session.inputModel.onScreenStop(input), 
       onHidePressed: onHide,
     );

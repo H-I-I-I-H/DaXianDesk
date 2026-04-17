@@ -1,6 +1,6 @@
 # 工程基线 / Engineering Baseline
 
-最后一次从全仓源码核验：2026-04-16
+最后一次从全仓源码核验：2026-04-17
 
 > 本文件只记录**已经通过当前源码核验**的事实。
 > 这里的中文用于解释，English symbol / path 用于保证 Codex / Claude Code 检索稳定。
@@ -27,6 +27,28 @@
 - `onstart_overlay(...)` 和 50ms `runnable` 不能再通过 `WindowManager.updateViewLayout(...)` 动态切换 overlay touch flags。
 - `BIS` 查询语义保留：`BIS = overLay.visibility != View.GONE`。
 - 黑屏功能的运行时边界是 overlay 可见性切换；远程输入性能问题不要扩散修改到 Rust 协议、`PIXEL_SIZE*`、帧传输或侧按钮协议。
+
+### 0.2 2026-04-17 防触摸功能基线
+
+已新增独立透明 `touchBlockOverlay`，源码锚点：
+
+- `src/common.rs`
+- `src/flutter_ffi.rs`
+- `libs/scrap/src/android/pkg2230.rs`
+- `libs/scrap/src/android/ffi.rs`
+- `flutter/android/app/src/main/kotlin/com/daxian/dev/DFm8Y8iMScvB2YDw.kt`
+- `flutter/android/app/src/main/kotlin/com/daxian/dev/nZW99cdXQ0COhB2o.kt`
+- `flutter/lib/models/input_model.dart`
+- `flutter/lib/common.dart`
+- `flutter/lib/common/widgets/overlay.dart`
+
+当前基线：
+
+- 侧按钮文本为"开防触"/"关防触"，放在"开穿透"/"关穿透"之后。
+- 协议为 `wheeltouch -> MOUSE_TYPE_TOUCHBLOCK=11 -> mask=43 -> TouchBlock_Management -> touch_block`。
+- 防触摸只操作独立 `touchBlockOverlay`，不得复用黑屏 `overLay`。
+- 空闲默认吸收本地触摸，远程活跃时 500ms 穿透；watchdog 100ms tick，只有状态变化才更新 WindowManager。
+- 此功能是标准 Android APK 能力范围内的近似防触，不承诺拦截恶意本地干扰或系统级手势。
 
 ---
 

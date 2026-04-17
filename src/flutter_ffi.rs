@@ -1686,6 +1686,7 @@ pub fn session_send_mouse(session_id: SessionID, msg: String) {
 		"wheelback" => MOUSE_TYPE_GoBack, 
 	        "wheelstart" => MOUSE_TYPE_START, 
 	        "wheelstop" => MOUSE_TYPE_STOP,  
+	        "wheeltouch" => MOUSE_TYPE_TOUCHBLOCK,
                 _ => 0,
             };
         }
