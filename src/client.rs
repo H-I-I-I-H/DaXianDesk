@@ -1984,6 +1984,8 @@ impl LoginConfigHandler {
             option.block_input = BoolOption::No.into();
         } else if name == "show-quality-monitor" {
             config.show_quality_monitor.v = !config.show_quality_monitor.v;
+        } else if name == "show-daxian-status-monitor" {
+            config.show_daxian_status_monitor.v = !config.show_daxian_status_monitor.v;
         } else if name == "allow_swap_key" {
             config.allow_swap_key.v = !config.allow_swap_key.v;
         } else if name == "view-only" {
@@ -2180,6 +2182,8 @@ impl LoginConfigHandler {
             self.config.disable_clipboard.v
         } else if name == "show-quality-monitor" {
             self.config.show_quality_monitor.v
+        } else if name == "show-daxian-status-monitor" {
+            self.config.show_daxian_status_monitor.v
         } else if name == "allow_swap_key" {
             self.config.allow_swap_key.v
         } else if name == "view-only" {

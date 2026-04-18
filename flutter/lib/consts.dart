@@ -125,6 +125,7 @@ const String kOptionFollowRemoteCursor = "follow_remote_cursor";
 const String kOptionFollowRemoteWindow = "follow_remote_window";
 const String kOptionZoomCursor = "zoom-cursor";
 const String kOptionShowQualityMonitor = "show_quality_monitor";
+const String kOptionShowDaxianStatusMonitor = "show_daxian_status_monitor";
 const String kOptionDisableAudio = "disable_audio";
 const String kOptionEnableFileCopyPaste = "enable-file-copy-paste";
 // "Settings -> Display -> Other default options"

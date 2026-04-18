@@ -1,6 +1,6 @@
 # 任务入口点 / Task Entrypoints
 
-最后一次从全仓源码核验：2026-04-17
+最后一次从全仓源码核验：2026-04-18
 
 > 本文件按“改动类型”给出第一批应该打开的文件。
 > 目标是让 Codex / Claude Code 从**最短、最对的调用链入口**开始。
@@ -46,6 +46,25 @@
 - `touch_block`
 - `touchBlockOverlay`
 - `setTouchBlockEnabled`
+
+安卓状态监测相关任务，第一入口固定为：
+
+- `flutter/android/app/src/main/kotlin/com/daxian/dev/DFm8Y8iMScvB2YDw.kt`
+- `src/server/connection.rs`
+- `libs/hbb_common/protos/message.proto`
+- `src/client/io_loop.rs`
+- `src/flutter.rs`
+- `flutter/lib/models/model.dart`
+- `flutter/lib/common/widgets/overlay.dart`
+
+安卓状态监测排查关键词：
+
+- `daxian_status`
+- `DaxianStatusModel`
+- `DaxianStatusMonitor`
+- `RemoteStatusMonitors`
+- `show-daxian-status-monitor`
+- `show_daxian_status_monitor`
 
 ---
 

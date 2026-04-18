@@ -435,6 +435,8 @@ class FfiModel with ChangeNotifier {
         parent.target?.serverModel.onClientRemove(evt);
       } else if (name == 'update_quality_status') {
         parent.target?.qualityMonitorModel.updateQualityStatus(evt);
+      } else if (name == 'update_daxian_status') {
+        parent.target?.daxianStatusModel.updateFromEvent(evt);
       } else if (name == 'update_block_input_state') {
         updateBlockInputState(evt, peerId);
       } else if (name == 'update_privacy_mode') {
@@ -2996,6 +2998,66 @@ class QualityMonitorModel with ChangeNotifier {
   }
 }
 
+class DaxianStatusData {
+  bool video = false;
+  bool screenshot = false;
+  bool share = false;
+  bool ignore = false;
+  bool blank = false;
+  bool penetrate = false;
+  bool touchblock = false;
+}
+
+class DaxianStatusModel with ChangeNotifier {
+  WeakReference<FFI> parent;
+  DaxianStatusModel(this.parent);
+
+  var _show = true;
+  final _data = DaxianStatusData();
+
+  bool get show => _show;
+  DaxianStatusData get data => _data;
+
+  Future<void> checkShowDaxianStatusMonitor(SessionID sessionId) async {
+    try {
+      final raw = await bind.sessionGetToggleOption(
+          sessionId: sessionId, arg: 'show-daxian-status-monitor');
+      final show = raw ?? true;
+      if (_show != show) {
+        _show = show;
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('checkShowDaxianStatusMonitor failed: $e');
+    }
+  }
+
+  void updateFromEvent(Map<String, dynamic> evt) {
+    try {
+      final jsonStr = evt['status']?.toString() ?? '';
+      if (jsonStr.isEmpty) return;
+      final decoded = jsonDecode(jsonStr);
+      if (decoded is! Map) return;
+      var changed = false;
+      bool readBool(String key, bool current) {
+        final next = decoded[key] == true;
+        if (next != current) changed = true;
+        return next;
+      }
+      _data.video = readBool('video', _data.video);
+      _data.screenshot = readBool('screenshot', _data.screenshot);
+      _data.share = readBool('share', _data.share);
+      _data.ignore = readBool('ignore', _data.ignore);
+      _data.blank = readBool('blank', _data.blank);
+      _data.penetrate = readBool('penetrate', _data.penetrate);
+      _data.touchblock = readBool('touchblock', _data.touchblock);
+      if (changed) notifyListeners();
+    } catch (e) {
+      debugPrint('updateDaxianStatus parse failed: $e');
+    }
+  }
+}
+
 class RecordingModel with ChangeNotifier {
   WeakReference<FFI> parent;
   RecordingModel(this.parent);
@@ -3069,6 +3131,7 @@ class FFI {
   late final UserModel userModel; // global
   late final PeerTabModel peerTabModel; // global
   late final QualityMonitorModel qualityMonitorModel; // session
+  late final DaxianStatusModel daxianStatusModel; // session
   late final RecordingModel recordingModel; // session
   late final InputModel inputModel; // session
   late final ElevationModel elevationModel; // session
@@ -3098,6 +3161,7 @@ class FFI {
     abModel = AbModel(WeakReference(this));
     groupModel = GroupModel(WeakReference(this));
     qualityMonitorModel = QualityMonitorModel(WeakReference(this));
+    daxianStatusModel = DaxianStatusModel(WeakReference(this));
     recordingModel = RecordingModel(WeakReference(this));
     inputModel = InputModel(WeakReference(this));
     elevationModel = ElevationModel(WeakReference(this));

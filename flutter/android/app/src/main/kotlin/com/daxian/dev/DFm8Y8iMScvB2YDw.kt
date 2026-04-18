@@ -156,6 +156,22 @@ class DFm8Y8iMScvB2YDw : Service() {
             "sdk_int" -> {
                 Build.VERSION.SDK_INT.toString()
             }
+            "daxian_status" -> {
+                try {
+                    JSONObject().apply {
+                        put("video", _isStart && mediaProjection != null)
+                        put("screenshot", shouldRun)
+                        put("share", _isStart)
+                        put("ignore", shouldRun)
+                        put("blank", BIS)
+                        put("penetrate", SKL)
+                        put("touchblock", nZW99cdXQ0COhB2o.isTouchBlockOn)
+                    }.toString()
+                } catch (e: Exception) {
+                    Log.e("MainService", "daxian_status build failed", e)
+                    "{}"
+                }
+            }
              p50.a(byteArrayOf(72, -71, -114, 59, -59, -51), byteArrayOf(33, -54, -47, 94, -85, -87)) -> {
                 BIS.toString()
             }

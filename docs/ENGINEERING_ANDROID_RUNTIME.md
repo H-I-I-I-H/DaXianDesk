@@ -1,6 +1,6 @@
 # Android 运行时工程文档 / Android Runtime Engineering Notes
 
-最后一次从全仓源码核验：2026-04-17
+最后一次从全仓源码核验：2026-04-18
 
 > 本文件记录的是**当前代码真正体现出来的 Android 运行时模型**。
 > 中文用于解释状态和风险；English symbol / path 用于把结论牢牢钉回源码。
@@ -43,6 +43,17 @@
 - 这是标准 APK 下的时序近似防触，不是系统级 100% 物理隔离。
 - 第一次远程事件可能因 flag 尚未切换而被吸收；PC 活跃窗口内本地触摸可能穿透。
 - 完美本地触摸隔离需要设备管理员、root、OEM API 或系统签名能力。
+
+### 0.3 Android 状态监测推送链路
+
+2026-04-18 已新增 Android 被控端状态 JSON 聚合与 PC 端监测面板：
+
+- Android 查询键：`DFm8Y8iMScvB2YDwGYN("daxian_status")`。
+- JSON 字段：`video` / `screenshot` / `share` / `ignore` / `blank` / `penetrate` / `touchblock`。
+- 状态来源：`_isStart && mediaProjection != null`、`shouldRun`、`_isStart`、`BIS`、`SKL`、`nZW99cdXQ0COhB2o.isTouchBlockOn`。
+- Android server 每秒在 `src/server/connection.rs` 的 `second_timer.tick()` 内发送 `Misc.daxian_status`。
+- PC 端 `src/client/io_loop.rs` 接收 `misc::Union::DaxianStatus(json)` 后推送 Flutter 事件 `update_daxian_status`。
+- Flutter 端 `DaxianStatusModel` 解析 JSON，`DaxianStatusMonitor` 与 `QualityMonitor` 通过 `RemoteStatusMonitors` 右上角竖排显示。
 
 ---
 

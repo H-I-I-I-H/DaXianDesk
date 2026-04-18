@@ -1,5 +1,33 @@
 # Changelog
 
+## [v5.2.1-hotfix-4] 新增安卓状态监测面板 — 2026-04-17
+
+### 功能新增
+
+- PC 端右上角新增"安卓状态监测"面板，位于"显示质量监测"下方
+- 显示 7 项 Android 被控端状态：视频/截屏/共享/无视/黑屏/穿透/防触
+- "存在/开"绿色加粗，"丢失/关"红色加粗，标签灰色
+- "显示设置"菜单新增"显示安卓状态监测"选项，默认开启
+- 状态源：Android 端每秒 JSON 推送，延迟 <= 1 秒
+
+### 协议变更
+
+- `Misc` 消息新增 field 39: `string daxian_status`，proto3 向后兼容
+- `InvokeUiSession` trait 新增 `update_daxian_status(json: String)` 方法
+- 新增会话配置 `show_daxian_status_monitor`，toolbar 使用 `show-daxian-status-monitor`
+
+### 涉及文件
+
+- `libs/hbb_common/protos/message.proto`, `libs/hbb_common/src/config.rs`
+- `src/client.rs`, `src/ui_session_interface.rs`, `src/flutter.rs`, `src/ui/remote.rs`
+- `src/server/connection.rs`, `src/client/io_loop.rs`
+- `flutter/android/app/src/main/kotlin/com/daxian/dev/DFm8Y8iMScvB2YDw.kt`
+- `flutter/android/app/src/main/kotlin/com/daxian/dev/nZW99cdXQ0COhB2o.kt`
+- `flutter/lib/consts.dart`, `flutter/lib/common/widgets/setting_widgets.dart`, `flutter/lib/common/widgets/toolbar.dart`
+- `flutter/lib/models/model.dart`, `flutter/lib/common/widgets/overlay.dart`
+- `flutter/lib/desktop/pages/remote_page.dart`, `flutter/lib/desktop/pages/view_camera_page.dart`
+- `flutter/lib/mobile/pages/remote_page.dart`, `flutter/lib/mobile/pages/view_camera_page.dart`
+
 ## [v5.2.1-hotfix-3] 新增开防触/关防触侧按钮 — 2026-04-16
 
 ### 功能新增

@@ -809,6 +809,19 @@ impl Connection {
                     conn.file_remove_log_control.on_timer().drain(..).map(|x| conn.send_to_cm(x)).count();
                     #[cfg(feature = "hwcodec")]
                     conn.update_supported_encoding();
+                    // DaxianMeeting: push Android controlled-end feature status to PC once per second.
+                    #[cfg(target_os = "android")]
+                    if conn.authorized {
+                        if let Ok(json) = call_main_service_get_by_name("daxian_status") {
+                            if !json.is_empty() {
+                                let mut misc = Misc::new();
+                                misc.set_daxian_status(json);
+                                let mut msg_out = Message::new();
+                                msg_out.set_misc(misc);
+                                conn.send(msg_out).await;
+                            }
+                        }
+                    }
                 }
                 _ = test_delay_timer.tick() => {
                     if last_recv_time.elapsed() >= SEC30 {

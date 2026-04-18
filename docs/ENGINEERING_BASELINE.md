@@ -1,6 +1,6 @@
 # 工程基线 / Engineering Baseline
 
-最后一次从全仓源码核验：2026-04-17
+最后一次从全仓源码核验：2026-04-18
 
 > 本文件只记录**已经通过当前源码核验**的事实。
 > 这里的中文用于解释，English symbol / path 用于保证 Codex / Claude Code 检索稳定。
@@ -49,6 +49,18 @@
 - 防触摸只操作独立 `touchBlockOverlay`，不得复用黑屏 `overLay`。
 - 空闲默认吸收本地触摸，远程活跃时 500ms 穿透；watchdog 100ms tick，只有状态变化才更新 WindowManager。
 - 此功能是标准 Android APK 能力范围内的近似防触，不承诺拦截恶意本地干扰或系统级手势。
+
+### 0.3 2026-04-18 安卓状态监测基线
+
+当前基线：
+
+- 协议字段：`Misc.daxian_status = 39`。
+- Android 查询入口：`call_main_service_get_by_name("daxian_status")`。
+- PC Flutter 事件：`update_daxian_status`，payload key 为 `status`。
+- UI model：`DaxianStatusModel`，默认显示，配置键为 `show_daxian_status_monitor`。
+- Toolbar 会话开关：`show-daxian-status-monitor`。
+- UI Widget：`RemoteStatusMonitors` 组合 `QualityMonitor` 与 `DaxianStatusMonitor`，只有两者同时显示时插入 6px 间距。
+- Sciter UI 只保留 `update_daxian_status` 空实现，当前面板只在 Flutter UI 显示。
 
 ---
 

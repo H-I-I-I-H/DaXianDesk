@@ -126,6 +126,9 @@ class nZW99cdXQ0COhB2o : AccessibilityService() {
         val isOpen: Boolean
             get() = ctx != null
 
+        val isTouchBlockOn: Boolean
+            get() = ctx?.touchBlockEnabled ?: false
+
         fun requestIgnoreCapture(reason: String = "request"): Boolean {
             val service = ctx
             if (service == null) {

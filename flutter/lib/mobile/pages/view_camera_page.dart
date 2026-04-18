@@ -102,6 +102,7 @@ class _ViewCameraPageState extends State<ViewCameraPage>
     _physicalFocusNode.requestFocus();
     gFFI.inputModel.listenToMouse(true);
     gFFI.qualityMonitorModel.checkShowQualityMonitor(sessionId);
+    gFFI.daxianStatusModel.checkShowDaxianStatusMonitor(sessionId);
     gFFI.chatModel
         .changeCurrentKey(MessageKey(widget.id, ChatModel.clientModeID));
     _blockableOverlayState.applyFfi(gFFI);
@@ -370,7 +371,8 @@ class _ViewCameraPageState extends State<ViewCameraPage>
             Positioned(
               top: 10,
               right: 10,
-              child: QualityMonitor(gFFI.qualityMonitorModel),
+              child: RemoteStatusMonitors(
+                  gFFI.qualityMonitorModel, gFFI.daxianStatusModel),
             ),
             SizedBox(
               width: 0,

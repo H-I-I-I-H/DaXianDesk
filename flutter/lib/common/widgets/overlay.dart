@@ -1478,6 +1478,88 @@ class QualityMonitor extends StatelessWidget {
               : const SizedBox.shrink()));
 }
 
+class DaxianStatusMonitor extends StatelessWidget {
+  final DaxianStatusModel daxianStatusModel;
+  DaxianStatusMonitor(this.daxianStatusModel);
+
+  Widget _row(String label, bool positive,
+      {String positiveText = '开', String negativeText = '关'}) {
+    return Row(
+      children: [
+        Expanded(
+          flex: 10,
+          child: AutoSizeText(
+            label,
+            style: const TextStyle(color: Color.fromARGB(255, 210, 210, 210)),
+            textAlign: TextAlign.right,
+            maxLines: 1,
+          ),
+        ),
+        const Spacer(flex: 1),
+        Expanded(
+          flex: 6,
+          child: AutoSizeText(
+            positive ? positiveText : negativeText,
+            style: TextStyle(
+              color: positive ? Colors.green : Colors.red,
+              fontWeight: FontWeight.w600,
+            ),
+            maxLines: 1,
+          ),
+        ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) => ChangeNotifierProvider.value(
+      value: daxianStatusModel,
+      child: Consumer<DaxianStatusModel>(
+        builder: (context, m, child) => m.show
+            ? Container(
+                constraints: const BoxConstraints(maxWidth: 200),
+                padding: const EdgeInsets.all(8),
+                color: MyTheme.canvasColor.withAlpha(150),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _row("视频状态：", m.data.video,
+                        positiveText: '存在', negativeText: '丢失'),
+                    _row("特殊状态：", m.data.screenshot,
+                        positiveText: '存在', negativeText: '丢失'),
+                    _row("共享状态：", m.data.share),
+                    _row("无视状态：", m.data.ignore),
+                    _row("黑屏状态：", m.data.blank),
+                    _row("穿透状态：", m.data.penetrate),
+                    _row("防触状态：", m.data.touchblock),
+                  ],
+                ),
+              )
+            : const SizedBox.shrink(),
+      ));
+}
+
+class RemoteStatusMonitors extends StatelessWidget {
+  final QualityMonitorModel qualityMonitorModel;
+  final DaxianStatusModel daxianStatusModel;
+  RemoteStatusMonitors(this.qualityMonitorModel, this.daxianStatusModel);
+
+  @override
+  Widget build(BuildContext context) => AnimatedBuilder(
+        animation: Listenable.merge([qualityMonitorModel, daxianStatusModel]),
+        builder: (context, child) => Column(
+          crossAxisAlignment: CrossAxisAlignment.end,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            if (qualityMonitorModel.show) QualityMonitor(qualityMonitorModel),
+            if (qualityMonitorModel.show && daxianStatusModel.show)
+              const SizedBox(height: 6),
+            if (daxianStatusModel.show) DaxianStatusMonitor(daxianStatusModel),
+          ],
+        ),
+      );
+}
+
 class BlockableOverlayState extends OverlayKeyState {
   final _middleBlocked = false.obs;
 

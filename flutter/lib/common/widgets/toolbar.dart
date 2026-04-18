@@ -592,6 +592,17 @@ Future<List<TToggleMenu>> toolbarDisplayToggle(
         ffi.qualityMonitorModel.checkShowQualityMonitor(sessionId);
       },
       child: Text(translate('Show quality monitor'))));
+  // show Android controlled-end status monitor
+  final daxianOption = 'show-daxian-status-monitor';
+  v.add(TToggleMenu(
+      value: bind.sessionGetToggleOptionSync(
+          sessionId: sessionId, arg: daxianOption),
+      onChanged: (value) async {
+        if (value == null) return;
+        await bind.sessionToggleOption(sessionId: sessionId, value: daxianOption);
+        ffi.daxianStatusModel.checkShowDaxianStatusMonitor(sessionId);
+      },
+      child: Text(translate('Show daxian status monitor'))));
   // mute
   if (isDefaultConn && perms['audio'] != false) {
     final option = 'disable-audio';

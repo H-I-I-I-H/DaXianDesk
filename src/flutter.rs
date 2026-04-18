@@ -716,6 +716,10 @@ impl InvokeUiSession for FlutterHandler {
         );
     }
 
+    fn update_daxian_status(&self, json: String) {
+        self.push_event("update_daxian_status", &[("status", &json)], &[]);
+    }
+
     fn set_connection_type(&self, is_secured: bool, direct: bool) {
         self.push_event(
             "connection_ready",

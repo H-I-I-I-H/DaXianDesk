@@ -1837,6 +1837,9 @@ impl<T: InvokeUiSession> Remote<T> {
                     Some(misc::Union::FollowCurrentDisplay(d_idx)) => {
                         self.handler.set_current_display(d_idx);
                     }
+                    Some(misc::Union::DaxianStatus(json)) => {
+                        self.handler.update_daxian_status(json);
+                    }
                     _ => {}
                 },
                 Some(message::Union::TestDelay(t)) => {

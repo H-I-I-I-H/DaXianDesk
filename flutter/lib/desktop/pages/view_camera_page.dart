@@ -131,6 +131,7 @@ class _ViewCameraPageState extends State<ViewCameraPage>
     _ffi.ffiModel.updateEventListener(sessionId, widget.id);
     if (!isWeb) bind.pluginSyncUi(syncTo: kAppTypeDesktopRemote);
     _ffi.qualityMonitorModel.checkShowQualityMonitor(sessionId);
+    _ffi.daxianStatusModel.checkShowDaxianStatusMonitor(sessionId);
     _ffi.dialogManager.loadMobileActionsOverlayVisible();
     DesktopMultiWindow.addListener(this);
     // if (!_isCustomCursorInited) {
@@ -484,7 +485,11 @@ class _ViewCameraPageState extends State<ViewCameraPage>
         top: 10,
         right: 10,
         child: _buildRawTouchAndPointerRegion(
-            QualityMonitor(_ffi.qualityMonitorModel), null, null),
+          RemoteStatusMonitors(
+              _ffi.qualityMonitorModel, _ffi.daxianStatusModel),
+          null,
+          null,
+        ),
       ),
     );
     return Stack(
